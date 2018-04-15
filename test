@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 
 from digikey import Session
+from digikey.search import CatSearch
 
 d = Session(country='CA')
 d.init_groups()
+
+cat = d.categories['Integrated Circuits (ICs)/Memory']
+
+search = CatSearch(session=d, category=cat)
+
+
 pass

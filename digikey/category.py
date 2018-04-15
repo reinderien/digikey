@@ -1,8 +1,8 @@
-import re
 from bs4 import NavigableString
 
 
 class Category:
+    import re
     rex_count = re.compile(r'\((\d+)')
 
     def __init__(self, group, elm):
