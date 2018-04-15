@@ -1,2 +1,7 @@
 #!/usr/bin/env python3
 
+from digikey import Session
+
+d = Session(country='CA')
+d.init_groups()
+pass
