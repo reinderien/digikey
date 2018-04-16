@@ -1,5 +1,5 @@
 from bs4 import NavigableString
-from .search import MultiParam, Searchable
+from .search import MultiParam, UIntParam, Searchable
 
 
 class Filter(MultiParam):
@@ -12,7 +12,13 @@ class Filter(MultiParam):
         # todo - deal with min/max selection
 
     def validate(self, value):
+        if value is None:
+            return True
         return isinstance(value, set) and not (value - self.option_titles)
+
+    def update_qps(self, qps, value=None):
+        if value:
+            qps[self.name] = {self.options[v] for v in value}
 
 
 class Category(Searchable):
@@ -41,4 +47,5 @@ class Category(Searchable):
         col_names = (e.text for e in headers.find_all(name='th'))
         filter_row = doc.find(name='tr', id='appliedFilterOptions')
         filter_cells = filter_row.find_all(name='td', class_='ptable-param')
-        return (Filter(head, cell) for head, cell in zip(col_names, filter_cells))
+        return (UIntParam('Page Size', 'pageSize', 25),
+                *(Filter(head, cell) for head, cell in zip(col_names, filter_cells)))

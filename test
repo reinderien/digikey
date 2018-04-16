@@ -7,7 +7,6 @@ d.init_groups()
 
 cat = d.categories['Integrated Circuits (ICs)/Memory']
 cat.init_params()
-resp = cat.search({cat.params['In Stock']: 1,
-                   cat.params['Technology']: {'DRAM - EDO'}})
+resp = cat.search({'Series': {'EM-20'}})
 
 pass

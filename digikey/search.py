@@ -8,6 +8,12 @@ class Param:
     def validate(self, value):
         return True
 
+    def update_qps(self, qps, value=None):
+        if not value:
+            value = self.default
+        if value is not None:
+            qps[self.name] = str(value)
+
 
 class BoolParam(Param):
     def __init__(self, title, name, default=None):
@@ -22,7 +28,7 @@ class UIntParam(Param):
         super().__init__(title, name, default)
 
     def validate(self, value):
-        return isinstance(value, int) and value >= 0
+        return (value is None) or (isinstance(value, int) and value >= 0)
 
 
 class MultiParam(Param):
@@ -30,11 +36,32 @@ class MultiParam(Param):
         super().__init__(title, name, default)
 
     def validate(self, value):
+        if value is None:
+            return True
         try:
             iter(value)
             return True
         except TypeError:
             return False
+
+
+class ROHSParam(Param):
+    def __init__(self, title='ROHS-Compliant', name='rohs', default=None):
+        super().__init__(title, name, default)
+
+    def validate(self, value):
+        return value in ('y', 'n', None)
+
+    def update_qps(self, qps, value=None):
+        if not value:
+            value = self.default
+        if value == 'y':
+            name = self.name
+        elif value == 'n':
+            name = 'non' + self.name
+        else:
+            return
+        qps[name] = '1'
 
 
 """
@@ -67,8 +94,7 @@ SHARED_PARAMS = (BoolParam('In Stock', 'stock', 1),
                  BoolParam('Datasheet Available', 'datasheet'),
                  BoolParam('Photo Available', 'photo'),
                  BoolParam('CAD Model Available', 'cad'),
-                 BoolParam('ROHS-compliant', 'rohs'),
-                 BoolParam('Non-ROHS-compliant', 'nonrohs'),
+                 ROHSParam(),
                  UIntParam('Quantity', 'quantity'),
                  MultiParam('Keywords', 'k'))
 
@@ -89,13 +115,17 @@ class Searchable:
         """
         print('Searching in %s...' % self.title)
 
+        bad_keys = set(param_values.keys()) - set(self.params.keys())
+        if bad_keys:
+            raise ValueError('Bad parameter keys: ' + ','.join(bad_keys))
+
         qps = {}
-        for param, val in param_values.items():
-            assert(isinstance(param, Param))
-            if not param.validate(val):
+        for param_title, param in self.params.items():
+            value = param_values.get(param_title)
+            if not param.validate(value):
                 raise ValueError('"%s" is not a valid value for %s %s' %
-                                 (str(val), type(param).__name__, param.title))
-            qps[param.name] = str(val)
+                                 (str(value), type(param).__name__, param.title))
+            param.update_qps(qps, value)
         return self.session.get_doc(self.path, qps)
 
     def _get_addl_params(self):
