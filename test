@@ -5,8 +5,8 @@ from digikey import Session
 d = Session(country='CA')
 d.init_groups()
 
-cat = d.categories['Integrated Circuits (ICs)/Memory']
+cat = d.categories['Resistors/Through Hole Resistors']
 cat.init_params()
-resp = cat.search({'Series': {'EM-20'}})
+resp = cat.search({'Resistance': {'500 Ohms'}})
 
 pass

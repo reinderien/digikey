@@ -95,7 +95,7 @@ SHARED_PARAMS = (BoolParam('In Stock', 'stock', 1),
                  BoolParam('Photo Available', 'photo'),
                  BoolParam('CAD Model Available', 'cad'),
                  ROHSParam(),
-                 UIntParam('Quantity', 'quantity'),
+                 UIntParam('Quantity', 'quantity', 1),
                  MultiParam('Keywords', 'k'))
 
 

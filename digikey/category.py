@@ -3,12 +3,12 @@ from .search import MultiParam, UIntParam, Searchable
 
 
 class Filter(MultiParam):
-    def __init__(self, head, cell):
+    def __init__(self, head, cell, default=None):
         select = cell.find(name='select', recursive=False)
         self.options = {o.text.strip(): o.attrs['value']
                         for o in select.find_all(name='option', recursive=False)}
         self.option_titles = set(self.options.keys())
-        super().__init__(title=head, name=select.attrs['name'])
+        super().__init__(title=head, name=select.attrs['name'], default=default)
         # todo - deal with min/max selection
 
     def validate(self, value):
@@ -17,6 +17,8 @@ class Filter(MultiParam):
         return isinstance(value, set) and not (value - self.option_titles)
 
     def update_qps(self, qps, value=None):
+        if value is None:
+            value = self.default
         if value:
             qps[self.name] = {self.options[v] for v in value}
 
@@ -46,8 +48,16 @@ class Category(Searchable):
         table = doc.find(name='table', class_='filters-group')
         headers = table.select('tr#appliedFilterHeaderRow > th')
         cells = table.select('tr#appliedFilterOptions > td')
-        return (UIntParam('Page Size', 'pageSize', 25),
-                *(Filter(head.text, cell) for head, cell in zip(headers, cells)))
+
+        filters = [UIntParam('Page Size', 'pageSize', 25)]
+        for head, cell in zip(headers, cells):
+            title = head.text
+            if title == 'Part Status':
+                default = {'Active'}
+            else:
+                default = None
+            filters.append(Filter(title, cell, default))
+        return filters
 
     @staticmethod
     def _get_heads(table):
