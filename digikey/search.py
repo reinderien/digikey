@@ -110,7 +110,7 @@ class Searchable:
 
     def search(self, param_values):
         """
-        :param param_values: A dictionary of {param object: value}
+        :param param_values: A dictionary of {param name: value}
         :return:
         """
         print('Searching in %s...' % self.title)

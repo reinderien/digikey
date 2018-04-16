@@ -17,8 +17,7 @@ class Group(Searchable):
     @staticmethod
     def get_all(session):
         print('Initializing category list...')
-        doc = session.get_doc('products/' + session.short_lang)
-        products = doc.find(name='div', id='productIndexList')
-        group_heads = products.find_all(name='h2', recursive=False)
+        doc = session.get_doc(session.path)
+        group_heads = doc.select('div#productIndexList > h2')
         for group_head in group_heads:
             yield Group(session, group_head)
