@@ -1,19 +1,18 @@
 from .category import Category
+from .search import Searchable
 
 
-class Group:
-    def __init__(self, elm):
-        self.title = elm.text
-
-        self.path = elm.find(name='a').attrs['href']
-        self.name, self.code = self.path.split('/')[-2:]
+class Group(Searchable):
+    def __init__(self, session, elm):
+        super().__init__(session=session, title=elm.text, path=elm.find(name='a').attrs['href'])
+        super().init_params()
         self.categories = {c.title: c for c in self._get_categories(elm)}
         self.size = sum(c.size for c in self.categories.values())
 
     def _get_categories(self, group_elm):
         ul = next(e for e in group_elm.next_siblings if e.name == 'ul')
         for cat_item in ul.find_all(name='li'):
-            yield Category(self, cat_item)
+            yield Category(self.session, self, cat_item)
 
     @staticmethod
     def get_all(session):
@@ -22,4 +21,4 @@ class Group:
         products = doc.find(name='div', id='productIndexList')
         group_heads = products.find_all(name='h2', recursive=False)
         for group_head in group_heads:
-            yield Group(group_head)
+            yield Group(session, group_head)

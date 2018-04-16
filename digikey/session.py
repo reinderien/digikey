@@ -1,8 +1,9 @@
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
+from .search import Searchable
 
 
-class Session:
+class Session(Searchable):
     def __init__(self, country='US', short_lang='en', long_lang=None, tld=None, currency=None):
         from requests import Session as RSession
         self._rsession = RSession()
@@ -27,16 +28,18 @@ class Session:
                                        'User-Agent': 'Mozilla/5.0'})
         self.categories = {}
         self.groups = {}
+        super().__init__(session=self, title='All', path='products/' + short_lang)
+        super().init_params()
 
     def init_groups(self):
         from .group import Group
 
         self.groups = {g.title: g for g in Group.get_all(self)}
-        self.categories = {c.full_title: c for g in self.groups.values()
+        self.categories = {c.title: c for g in self.groups.values()
                            for c in g.categories.values()}
 
-    def get_doc(self, path):
+    def get_doc(self, path, qps=None):
         url = urljoin(self.base, path)
-        resp = self._rsession.get(url)
+        resp = self._rsession.get(url, params=qps)
         resp.raise_for_status()
         return BeautifulSoup(resp.text, 'html.parser')

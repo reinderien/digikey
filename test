@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 
 from digikey import Session
-from digikey.search import CatSearch
 
 d = Session(country='CA')
 d.init_groups()
 
 cat = d.categories['Integrated Circuits (ICs)/Memory']
-
-search = CatSearch(session=d, category=cat)
-
+cat.init_params()
+resp = cat.search({cat.params['In Stock']: 1,
+                   cat.params['Technology']: {'DRAM - EDO'}})
 
 pass
