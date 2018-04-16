@@ -1,5 +1,6 @@
+import re
 from bs4 import NavigableString
-from .search import MultiParam, UIntParam, Searchable
+from .search import Param, MultiParam, UIntParam, Searchable
 
 
 class Filter(MultiParam):
@@ -21,6 +22,37 @@ class Filter(MultiParam):
             value = self.default
         if value:
             qps[self.name] = {self.options[v] for v in value}
+
+
+class SortParam(Param):
+    rex_sort = re.compile(r'sort\(([0-9\-]+)\);')
+
+    def __init__(self, doc, default=None):
+        super().__init__(title='Column Sort', name='ColumnSort', default=default)
+
+        self.by = {}
+
+        table = doc.find(name='table', id='productTable')
+        heads = Category.get_heads(table)
+        sorts = table.select('thead#tblhead > tr:nth-of-type(2) > td')
+
+        for head, sort in zip(heads, sorts):
+            for button in sort.select('button.ps-sortButtons'):
+                img = button.find(name='img', class_='nonsorted')
+                dirn = img.attrs['alt']
+                code = SortParam.rex_sort.search(button.attrs['onclick']).group(1)
+                self.by.setdefault(head, {})[dirn] = code
+
+    def validate(self, value):
+        if value is None:
+            return True
+        return isinstance(value, tuple) and len(value) == 2
+
+    def update_qps(self, qps, value=None):
+        if value is None:
+            value = self.default
+        title, dirn = value
+        qps[self.name] = self.by[title][dirn]
 
 
 class Category(Searchable):
@@ -49,7 +81,8 @@ class Category(Searchable):
         headers = table.select('tr#appliedFilterHeaderRow > th')
         cells = table.select('tr#appliedFilterOptions > td')
 
-        filters = [UIntParam('Page Size', 'pageSize', 25)]
+        filters = [UIntParam('Page Size', 'pageSize', 25),
+                   SortParam(doc, default=('Unit Price', 'Ascending'))]
         for head, cell in zip(headers, cells):
             title = head.text
             if title == 'Part Status':
@@ -60,16 +93,16 @@ class Category(Searchable):
         return filters
 
     @staticmethod
-    def _get_heads(table):
-        for th in table.select('thead#tblhead > tr > th'):
+    def get_heads(table):
+        for th in table.select('thead#tblhead > tr:nth-of-type(1) > th'):
             cls = th.attrs['class'][0]
             if cls == 'th-datasheet':
                 head = 'Datasheet'  # this is shown as an image, no text
             elif 'th-unitPrice' in cls:
                 head = 'Unit Price'  # leave out the whitespace and currency
             else:
-                head = th.text
-            yield head.strip()
+                head = th.text.strip()
+            yield head
 
     @staticmethod
     def _get_parts(table, heads):
@@ -96,6 +129,6 @@ class Category(Searchable):
         # todo - pagination generator
         doc = super().search(param_values)
         table = doc.select('table#productTable')[0]
-        heads = tuple(Category._get_heads(table))
+        heads = tuple(Category.get_heads(table))
         parts = tuple(Category._get_parts(table, heads))
         return parts
