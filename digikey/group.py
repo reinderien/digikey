@@ -21,3 +21,8 @@ class Group(Searchable):
         group_heads = doc.select('div#productIndexList > h2')
         for group_head in group_heads:
             yield Group(session, group_head)
+
+    def search(self, param_values):
+        doc = super().search(param_values)
+        # Might go to a category page, or to a category list
+        raise NotImplemented()

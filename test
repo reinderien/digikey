@@ -5,8 +5,11 @@ from digikey import Session
 d = Session(country='CA')
 d.init_groups()
 
+'''
 cat = d.categories['Resistors/Through Hole Resistors']
 cat.init_params()
 resp = cat.search({'Resistance': {'500 Ohms'}})
+'''
 
+prods = d.search({'Keywords': ''})
 pass

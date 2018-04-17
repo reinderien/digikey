@@ -43,3 +43,8 @@ class Session(Searchable):
         resp = self._rsession.get(url, params=qps)
         resp.raise_for_status()
         return BeautifulSoup(resp.text, 'html.parser')
+
+    def search(self, param_values):
+        doc = super().search(param_values)
+        # Might go to a category page, or to a group list
+        raise NotImplemented()
