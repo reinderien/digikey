@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 
 from digikey import Session
+from pprint import pprint
 
-d = Session(country='CA')
-d.init_groups()
+d = Session.try_deserialize()
+is_new = d is None
+if is_new:
+    d = Session(country='CA')
+    d.init_groups()
 
-'''
 cat = d.categories['Resistors/Through Hole Resistors']
-cat.init_params()
-resp = cat.search({'Resistance': {'500 Ohms'}})
-'''
+if is_new:
+    cat.init_params()
+prods = cat.search({'Resistance': {'500 Ohms'}})
 
-prods = d.search({'Keywords': ''})
-pass
+# prods = d.search({'Keywords': ''})
+pprint(prods)
+d.serialize()

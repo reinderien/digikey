@@ -1,9 +1,15 @@
+from os import path, mkdir
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
+import lzma
+import pickle
 from .search import Searchable
 
 
 class Session(Searchable):
+    pick_dir = '.digikey'
+    pick_file = path.join(pick_dir, 'session.pickle.xz')
+
     def __init__(self, country='US', short_lang='en', long_lang=None, tld=None, currency=None):
         from requests import Session as RSession
         self._rsession = RSession()
@@ -48,3 +54,20 @@ class Session(Searchable):
         doc = super().search(param_values)
         # Might go to a category page, or to a group list
         raise NotImplemented()
+
+    def serialize(self):
+        if not path.isdir(Session.pick_dir):
+            mkdir(Session.pick_dir)
+        '''
+        The session has references to both categories and groups
+        Categories have references to params if init_params has been called
+        '''
+        with lzma.open(Session.pick_file, 'wb') as f:
+            pickle.dump(self, f)
+
+    @staticmethod
+    def try_deserialize():
+        if path.isfile(Session.pick_file):
+            print('Restoring cached session...')
+            with lzma.open(Session.pick_file, 'rb') as f:
+                return pickle.load(f)
