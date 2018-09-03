@@ -56,7 +56,6 @@ class SortParam(Param):
 
 
 class Category(Searchable):
-    import re
     rex_count = re.compile(r'\((\d+)')
 
     def __init__(self, session, group, elm):
