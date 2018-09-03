@@ -90,7 +90,7 @@ class Session(Searchable):
 
     def search(self, param_values):
         """
-        Search at the top level. Currently not implemented.
+        Search at the top level. Currently not implemented. todo.
         :param param_values: A dictionary of {param name: value}
         :return: Parts? Group counts? Haven't decided yet.
         """
