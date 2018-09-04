@@ -149,19 +149,50 @@ pv1989=0       Active
 
 
 class SharedParamFactory:
+    """
+    This is a way to accommodate i18n for the various DigiKey sites  Parameters have query parameter
+    names that do not change (are always English), but the human-legible titles change by language.
+    Instances of this class scrape an example filter page for the title at a known place in the DOM,
+    and create a Param instance with an appropriate title field.
+    """
+
     def __init__(self, get_title, T, name, default=None):
+        """
+        :param get_title: A method that accepts a BS4 doc and returns a title string.
+        :param         T: The type of Param to create.
+        :param      name: The query parameter name.
+        :param   default: The default for the Param's value to take, or None.
+        """
         self.T, self.name, self.get_title, self.default = T, name, get_title, default
 
     def get(self, doc):
+        """
+        Scrape the doc for the title, and instantiate the Param.
+        :param doc: The BS4 doc to scrape.
+        :return: A Param subclass instance (of type 'T').
+        """
         title = self.get_title(doc)
         return self.T(title, self.name, self.default)
 
     @staticmethod
     def label_from(doc, name):
+        """
+        :param  doc: The BS4 doc to scrape.
+        :param name: The name of a checkbox input in the DOM.
+        :return: The text contents of the label for that checkbox.
+        """
         return doc.find('label', attrs={'for': name}).text.strip()
 
     @classmethod
     def checkbox(cls, name, default=None, T=BoolParam):
+        """
+        Set up an SPF instance that will find a checkbox input named 'name' in the DOM, find the
+        corresponding label, and use the text of that label for the resultant Param's title.
+        :param    name: The name of the checkbox input (also the name of the eventual QP)
+        :param default: The default for the resultant Param to use
+        :param       T: The subclass of Param to instantiate; defaults to BoolParam
+        :return:        An instance of SPF.
+        """
         def inner(doc):
             return cls.label_from(doc, name)
 
@@ -169,6 +200,15 @@ class SharedParamFactory:
 
     @classmethod
     def media_checkbox(cls, name, default=None):
+        """
+        Set up an SPF instance that will find a checkbox input named 'name' in the DOM. This is
+        expected to be a part of the 'Media Available' section on the filter page. The resultant
+        Param's title will then be a combination of 'Media Available' and the text from the
+        checkbox's label.
+        :param    name: The name of the checkbox input (also the name of the eventual QP)
+        :param default: The default for the resultant Param to use
+        :return:        An instance of SPF.
+        """
         def inner(doc):
             head = doc.select('div#f2 > div.filters-group-chkbxs > '
                               'div:nth-of-type(2) '
@@ -180,6 +220,9 @@ class SharedParamFactory:
 
     @classmethod
     def quantity(cls):
+        """
+        :return: An SPF instance that will create a UIntParam for 'quantity'.
+        """
         def inner(doc):
             # This is bad - parse 'Quantity' out of 'Enter Quantity'
             # This is definitely wrong for some languages
@@ -190,7 +233,7 @@ class SharedParamFactory:
         return cls(inner, UIntParam, 'quantity', 1)
 
 
-SPF = SharedParamFactory
+SPF = SharedParamFactory  # Abbreviation for convenience
 SHARED_PARAMS = (SPF.checkbox('stock', True),
                  SPF.checkbox('nstock'),
                  SPF.checkbox('newproducts'),
