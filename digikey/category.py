@@ -126,7 +126,7 @@ class Category(Searchable):
                    SortParam(doc, default=('Unit Price', 'Ascending'))]
         for head, cell in zip(headers, cells):
             title = head.text
-            if title == 'Part Status':
+            if title == 'Part Status':  # todo: this is not language-portable
                 default = {'Active'}
             else:
                 default = None
@@ -165,7 +165,7 @@ class Category(Searchable):
                     col = td.select('a.lnkDatasheet')[0].attrs.get('href')
                 elif cls == 'tr-image':
                     img = td.find('img')
-                    if img.attrs.get('alt') == 'Photo Not Available':
+                    if 'NoPhoto' in img.attrs.get('src', ''):
                         col = None
                     else:
                         col = img.attrs.get('zoomimg')
