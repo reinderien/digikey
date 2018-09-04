@@ -88,9 +88,19 @@ class SortParam(Param):
 
 
 class Category(Searchable):
+    """
+    Category is a subdivision of a group. Currently there are 898 categories in total. Searching
+    within a category is the most common operation, due to the powerful filtration interface.
+    """
+
     rex_count = re.compile(r'\((\d+)')
 
     def __init__(self, session, group, elm):
+        """
+        :param session: The digikey.session to use for requests
+        :param   group: The parent group object
+        :param     elm: The <li> corresponding to the category in the product index
+        """
         a = elm.find(name='a', recursive=False)
         self.short_title = a.text
         self.group = group
@@ -125,6 +135,10 @@ class Category(Searchable):
 
     @staticmethod
     def get_heads(table):
+        """
+        :param table: The <table> elm containing filters
+        :return: A generator of all filter heading strings
+        """
         for th in table.select('thead#tblhead > tr:nth-of-type(1) > th'):
             cls = th.attrs['class'][0]
             if cls == 'th-datasheet':
@@ -137,6 +151,11 @@ class Category(Searchable):
 
     @staticmethod
     def _get_parts(table, heads):
+        """
+        :param table: The <table> elm containing search results
+        :param heads: An iterable of all filter headings
+        :return: A generator of all parts returned
+        """
         for tr in table.select('tbody#lnkPart > tr'):
             part = {}
             cells = tr.find_all(name='td', recursive=False)
@@ -154,12 +173,19 @@ class Category(Searchable):
                     col = td.text
                 if col and cls != 'tr-compareParts':
                     part[head] = col.strip()
+                if cls == 'tr-dkPartNumber':
+                    link = td.find('a', recursive=False)
+                    part['Link'] = link.attrs['href']
             yield part
 
     def search(self, param_values):
+        """
+        Search this category. Calls super() to do the param and request work.
+        :param param_values: A dict of {'param_title': value}
+        :return: A generator of the resulting parts.
+        """
         # todo - pagination generator
         doc = super().search(param_values)
         table = doc.select('table#productTable')[0]
         heads = tuple(Category.get_heads(table))
-        parts = tuple(Category._get_parts(table, heads))
-        return parts
+        return Category._get_parts(table, heads)
