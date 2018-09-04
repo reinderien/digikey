@@ -130,6 +130,7 @@ pv1989=0       Active
        4       Last Time Buy
        7       Not for new designs
 """
+# todo - these are all English-dependent
 SHARED_PARAMS = (BoolParam('In Stock', 'stock', True),
                  BoolParam('Normally Stocking', 'nstock'),
                  BoolParam('New Products', 'newproducts'),

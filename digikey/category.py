@@ -124,7 +124,7 @@ class Category(Searchable):
         status_head = Category._get_part_status_head(doc)
 
         filters = [UIntParam('Page Size', 'pageSize', 25),
-                   SortParam(doc, default=('Unit Price', 'Ascending'))]
+                   SortParam(doc, default=('Unit Price', True))]  # todo - language-dependent
         for head, cell in zip(headers, cells):
             title = head.text
             filt = Filter(title, cell)
