@@ -3,6 +3,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 import lzma
 import pickle
+from .param import SHARED_PARAMS
 from .search import Searchable
 
 
@@ -48,8 +49,8 @@ class Session(Searchable):
         self.categories = {}
         self.groups = {}
         self.cache_dir, self.cache_file = Session._cache_defaults(cache_dir, cache_file)
+        self.shared_params = ()  # Not initialized until init_groups()
         super().__init__(session=self, title='All', path='products/' + short_lang)
-        super().init_params()
 
     @staticmethod
     def _cache_defaults(cache_dir, cache_file):
@@ -75,6 +76,20 @@ class Session(Searchable):
         self.groups = {g.title: g for g in Group.get_all(self)}
         self.categories = {c.title: c for g in self.groups.values()
                            for c in g.categories.values()}
+        self.init_params()
+
+    def init_params(self):
+        """
+        Initializes search parameters - in this case, both for the session and its groups. This
+        depends on there being at least one category already scraped.
+        """
+        first_cat = next(iter(self.categories.values()))
+        doc = self.get_doc(first_cat.path + '?pageSize=1')
+        self.shared_params = tuple(f.get(doc) for f in SHARED_PARAMS)
+
+        super().init_params()
+        for g in self.groups.values():
+            g.init_params()
 
     def get_doc(self, upath, qps=None):
         """

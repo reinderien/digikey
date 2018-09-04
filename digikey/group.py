@@ -16,7 +16,6 @@ class Group(Searchable):
         :param elm: The <h2> associated with this group.
         """
         super().__init__(session=session, title=elm.text, path=elm.find(name='a').attrs['href'])
-        super().init_params()
         self.categories = {c.short_title: c for c in self._get_categories(elm)}
         self.size = sum(c.size for c in self.categories.values())
 

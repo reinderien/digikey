@@ -1,37 +1,7 @@
 import re
 from bs4 import NavigableString
-from .search import Param, MultiParam, UIntParam, Searchable
-
-
-class Filter(MultiParam):
-    """
-    A multi-valued filter parameter represented as a set. The set of allowed values is
-    represented as a dict of {title: internal val}.
-    """
-
-    def __init__(self, head, cell, default=None):
-        """
-        :param    head: The head elm from the filter table
-        :param    cell: The cell elm from the filter table
-        :param default: Set of default values for this filter, or None
-        """
-        select = cell.find(name='select', recursive=False)
-        self.options = {o.text.strip(): o.attrs['value']
-                        for o in select.find_all(name='option', recursive=False)}
-        self.option_titles = set(self.options.keys())
-        super().__init__(title=head, name=select.attrs['name'], default=default)
-        # todo - deal with min/max selection
-
-    def validate(self, value):
-        if value is None:
-            return True
-        return isinstance(value, set) and not (value - self.option_titles)
-
-    def update_qps(self, qps, value=None):
-        if value is None:
-            value = self.default
-        if value:
-            qps[self.name] = {self.options[v] for v in value}
+from .param import Param, Filter, UIntParam
+from .search import Searchable
 
 
 class SortParam(Param):
@@ -122,14 +92,16 @@ class Category(Searchable):
         headers = table.select('tr#appliedFilterHeaderRow > th')
         cells = table.select('tr#appliedFilterOptions > td')
         status_head = Category._get_part_status_head(doc)
+        price_head = Category._get_price_head(doc)
+        page_head = Category._get_page_head(doc)
 
-        filters = [UIntParam('Page Size', 'pageSize', 25),
-                   SortParam(doc, default=('Unit Price', True))]  # todo - language-dependent
+        filters = [UIntParam(page_head, 'pageSize', 25),
+                   SortParam(doc, default=(price_head, True))]
         for head, cell in zip(headers, cells):
             title = head.text
             filt = Filter(title, cell)
             if title == status_head:
-                # This is hard-coded because 'Active' is not language-independent
+                # '0' is hard-coded because 'Active' is not language-independent
                 filt.default = {next(k for k,v in filt.options.items() if v=='0')}
             filters.append(filt)
         return filters
@@ -149,20 +121,33 @@ class Category(Searchable):
             if span:
                 return head
 
-
+    @classmethod
+    def _get_price_head(cls, doc):
+        th = doc.select('table#productTable > thead > '
+                        'tr:nth-of-type(1) > th.th-unitPrice')[0]
+        return cls._title_from_price_head(th)
 
     @staticmethod
-    def get_heads(table):
+    def _get_page_head(doc):
+        return doc.select('div.results-per-page > span')[0].text.strip()
+
+    @staticmethod
+    def _title_from_price_head(th):
+        # leave out the whitespace and currency.
+        return th.text.splitlines()[1].strip()
+
+    @classmethod
+    def get_heads(cls, table):
         """
         :param table: The <table> elm containing filters
         :return: A generator of all filter heading strings
         """
         for th in table.select('thead#tblhead > tr:nth-of-type(1) > th'):
-            cls = th.attrs['class'][0]
-            if cls == 'th-datasheet':
+            css_cls = th.attrs['class'][0]
+            if css_cls == 'th-datasheet':
                 head = 'Datasheet'  # this is shown as an image, no text
-            elif 'th-unitPrice' in cls:
-                head = th.text.splitlines()[1].strip()  # leave out the whitespace and currency.
+            elif 'th-unitPrice' in css_cls:
+                head = cls._title_from_price_head(th)
             else:
                 head = th.text.strip()
             yield head
