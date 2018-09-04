@@ -17,7 +17,7 @@ class Group(Searchable):
         """
         super().__init__(session=session, title=elm.text, path=elm.find(name='a').attrs['href'])
         super().init_params()
-        self.categories = {c.title: c for c in self._get_categories(elm)}
+        self.categories = {c.short_title: c for c in self._get_categories(elm)}
         self.size = sum(c.size for c in self.categories.values())
 
     def _get_categories(self, group_elm):
