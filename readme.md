@@ -31,3 +31,18 @@ search.
 
 Some basic information, such as the group and category lists, should be cached. This is 500kB+
 when pickled, 100kB+ compressed.
+
+A word on i18n
+--------------
+
+DigiKey is a huge corporation, so they're forced to care about language, country, and currency. 
+There is minor support for these in this project. In particular -
+
+Things that are localized:
+- Currency quantities
+- Group and region names
+- Whatever content returned in the search results that DK has localized
+
+Things that are not localized:
+- Status messages
+- The 'Link' part attribute name
