@@ -117,21 +117,39 @@ class Category(Searchable):
     def _get_addl_params(self):
         print('Initializing search for category %s...' % self.title)
 
-        doc = self.session.get_doc(self.path + '?pageSize=0')
+        doc = self.session.get_doc(self.path + '?pageSize=1')
         table = doc.find(name='table', class_='filters-group')
         headers = table.select('tr#appliedFilterHeaderRow > th')
         cells = table.select('tr#appliedFilterOptions > td')
+        status_head = Category._get_part_status_head(doc)
 
         filters = [UIntParam('Page Size', 'pageSize', 25),
                    SortParam(doc, default=('Unit Price', 'Ascending'))]
         for head, cell in zip(headers, cells):
             title = head.text
-            if title == 'Part Status':  # todo: this is not language-portable
-                default = {'Active'}
-            else:
-                default = None
-            filters.append(Filter(title, cell, default))
+            filt = Filter(title, cell)
+            if title == status_head:
+                # This is hard-coded because 'Active' is not language-independent
+                filt.default = {next(k for k,v in filt.options.items() if v=='0')}
+            filters.append(filt)
         return filters
+
+    @classmethod
+    def _get_part_status_head(cls, doc):
+        """
+        Get the language-variant 'Part Status' heading string
+        :param doc: The BS4 doc for the filter page
+        :return: The part status heading string appropriate for session.short_lang
+        """
+        table = doc.find(name='table', id='productTable')
+        heads = cls.get_heads(table)
+        result_cells = table.select('tbody#lnkPart > tr:nth-of-type(1) > td')
+        for head, cell in zip(heads, result_cells):
+            span = cell.find(name='span', id='part-status')
+            if span:
+                return head
+
+
 
     @staticmethod
     def get_heads(table):
@@ -144,7 +162,7 @@ class Category(Searchable):
             if cls == 'th-datasheet':
                 head = 'Datasheet'  # this is shown as an image, no text
             elif 'th-unitPrice' in cls:
-                head = 'Unit Price'  # leave out the whitespace and currency
+                head = th.text.splitlines()[1].strip()  # leave out the whitespace and currency.
             else:
                 head = th.text.strip()
             yield head
