@@ -12,7 +12,8 @@ if is_new:
 cat = d.categories['Resistors/Through Hole Resistors']
 if is_new:
     cat.init_params()
-prods = cat.search({'Resistance': {'500 Ohms'}})
+prods = cat.search({'Resistance': {'500 Ohms'},
+                    'Column Sort': ('Unit Price', True)})
 
 # prods = d.search({'Keywords': ''})
 pprint(prods)

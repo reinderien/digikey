@@ -4,7 +4,17 @@ from .search import Param, MultiParam, UIntParam, Searchable
 
 
 class Filter(MultiParam):
+    """
+    A multi-valued filter parameter represented as a set. The set of allowed values is
+    represented as a dict of {title: internal val}.
+    """
+
     def __init__(self, head, cell, default=None):
+        """
+        :param    head: The head elm from the filter table
+        :param    cell: The cell elm from the filter table
+        :param default: Set of default values for this filter, or None
+        """
         select = cell.find(name='select', recursive=False)
         self.options = {o.text.strip(): o.attrs['value']
                         for o in select.find_all(name='option', recursive=False)}
@@ -25,34 +35,56 @@ class Filter(MultiParam):
 
 
 class SortParam(Param):
+    """
+    Search parameter controlling result order. Value is of the form (t, dirn) where t is any of the
+    column titles, and dirn is either True (ascending) or False (descending).
+    """
+
     rex_sort = re.compile(r'sort\(([0-9\-]+)\);')
 
     def __init__(self, doc, default=None):
+        """
+        :param     doc: BeautifulSoup doc of the filter page
+        :param default: None, or ('col', bool)
+        """
         super().__init__(title='Column Sort', name='ColumnSort', default=default)
 
+        # Dict of {title: code}
         self.by = {}
 
         table = doc.find(name='table', id='productTable')
         heads = Category.get_heads(table)
-        sorts = table.select('thead#tblhead > tr:nth-of-type(2) > td')
+        cells = table.select('thead#tblhead > tr:nth-of-type(2) > td')
 
-        for head, sort in zip(heads, sorts):
-            for button in sort.select('button.ps-sortButtons'):
-                img = button.find(name='img', class_='nonsorted')
-                dirn = img.attrs['alt']
-                code = SortParam.rex_sort.search(button.attrs['onclick']).group(1)
-                self.by.setdefault(head, {})[dirn] = code
+        for head, cell in zip(heads, cells):
+            # Take the first (ascending) button only.
+            button = cell.find(name='button', class_='ps-sortButtons')
+            if not button:
+                continue
+            img = button.find(name='img', class_='nonsorted')
+            _, _, dirn = img.attrs['src'].rpartition('/')
+            assert(dirn.startswith('up'))
+
+            code = int(SortParam.rex_sort.search(button.attrs['onclick'])[1])
+            assert(code > 0)
+            self.by[head] = code
 
     def validate(self, value):
         if value is None:
             return True
-        return isinstance(value, tuple) and len(value) == 2
+        if not isinstance(value, tuple) or len(value) != 2:
+            return False
+        by, dirn = value
+        return by in self.by and isinstance(dirn, bool)
 
     def update_qps(self, qps, value=None):
         if value is None:
             value = self.default
         title, dirn = value
-        qps[self.name] = self.by[title][dirn]
+        code = self.by[title]
+        if not dirn:
+            code = -code
+        qps[self.name] = code
 
 
 class Category(Searchable):
@@ -69,7 +101,7 @@ class Category(Searchable):
             if isinstance(child, NavigableString):
                 match = Category.rex_count.search(child)
                 if match:
-                    self.size = int(match.group(1))
+                    self.size = int(match[1])
                     break
 
     def _get_addl_params(self):
