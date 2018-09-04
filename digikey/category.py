@@ -1,6 +1,6 @@
 import re
 from bs4 import NavigableString
-from .param import Param, Filter, UIntParam
+from .param import Param, Filter, UIntParam, SharedParamFactory
 from .search import Searchable
 
 
@@ -12,7 +12,7 @@ class SortParam(Param):
 
     rex_sort = re.compile(r'sort\(([0-9\-]+)\);')
 
-    def __init__(self, title, doc, default=None):
+    def __init__(self, heads, title, doc, default=None):
         """
         :param     doc: BeautifulSoup doc of the filter page
         :param default: None, or ('col', bool)
@@ -23,7 +23,6 @@ class SortParam(Param):
         self.by = {}
 
         table = doc.find(name='table', id='productTable')
-        heads = Category.get_heads(table)
         cells = table.select('thead#tblhead > tr:nth-of-type(2) > td')
 
         for head, cell in zip(heads, cells):
@@ -74,6 +73,7 @@ class Category(Searchable):
         a = elm.find(name='a', recursive=False)
         self.short_title = a.text
         self.group = group
+        self.heads = ()  # Initialized during _get_addl_params
         super().__init__(session=session, path=a.attrs['href'],
                          title='%s/%s' % (group.title, self.short_title))
 
@@ -88,16 +88,21 @@ class Category(Searchable):
         print('Initializing search for category %s...' % self.title)
 
         doc = self.session.get_doc(self.path + '?pageSize=1')
-        table = doc.find(name='table', class_='filters-group')
-        headers = table.select('tr#appliedFilterHeaderRow > th')
-        cells = table.select('tr#appliedFilterOptions > td')
-        status_head = Category._get_part_status_head(doc)
+        filter_table = doc.find(name='table', class_='filters-group')
+        headers = filter_table.select('tr#appliedFilterHeaderRow > th')
+        cells = filter_table.select('tr#appliedFilterOptions > td')
+        prod_table = doc.find(name='table', id='productTable')
+
+        datasheet_head = SharedParamFactory.label_from(doc, 'datasheet')
+        self.heads = tuple(Category.get_heads(prod_table, datasheet_head))
+
+        status_head = self._get_part_status_head(doc)
         price_head = Category._get_price_head(doc)
         page_head = Category._get_page_head(doc)
         sort_head = Category._get_sort_head(doc)
 
         filters = [UIntParam(page_head, 'pageSize', 25),
-                   SortParam(sort_head, doc, default=(price_head, True))]
+                   SortParam(self.heads, sort_head, doc, default=(price_head, True))]
         for head, cell in zip(headers, cells):
             title = head.text
             filt = Filter(title, cell)
@@ -107,17 +112,15 @@ class Category(Searchable):
             filters.append(filt)
         return filters
 
-    @classmethod
-    def _get_part_status_head(cls, doc):
+    def _get_part_status_head(self, doc):
         """
         Get the language-variant 'Part Status' heading string
         :param doc: The BS4 doc for the filter page
         :return: The part status heading string appropriate for session.short_lang
         """
         table = doc.find(name='table', id='productTable')
-        heads = cls.get_heads(table)
         result_cells = table.select('tbody#lnkPart > tr:nth-of-type(1) > td')
-        for head, cell in zip(heads, result_cells):
+        for head, cell in zip(self.heads, result_cells):
             span = cell.find(name='span', id='part-status')
             if span:
                 return head
@@ -151,23 +154,22 @@ class Category(Searchable):
         return '/'.join(alts)
 
     @classmethod
-    def get_heads(cls, table):
+    def get_heads(cls, table, datasheet_head):
         """
-        :param table: The <table> elm containing filters
+        :param table: The results <table> elm containing filters
         :return: A generator of all filter heading strings
         """
         for th in table.select('thead#tblhead > tr:nth-of-type(1) > th'):
             css_cls = th.attrs['class'][0]
             if css_cls == 'th-datasheet':
-                head = 'Datasheet'  # this is shown as an image, no text. todo - lang-dependent.
+                head = datasheet_head  # this is shown as an image, no text.
             elif 'th-unitPrice' in css_cls:
                 head = cls._title_from_price_head(th)
             else:
                 head = th.text.strip()
             yield head
 
-    @staticmethod
-    def _get_parts(table, heads):
+    def _get_parts(self, table):
         """
         :param table: The <table> elm containing search results
         :param heads: An iterable of all filter headings
@@ -176,7 +178,7 @@ class Category(Searchable):
         for tr in table.select('tbody#lnkPart > tr'):
             part = {}
             cells = tr.find_all(name='td', recursive=False)
-            for head, td in zip(heads, cells):
+            for head, td in zip(self.heads, cells):
                 cls = td.attrs['class'][0]
                 if cls == 'tr-datasheet':
                     col = td.select('a.lnkDatasheet')[0].attrs.get('href')
@@ -204,5 +206,4 @@ class Category(Searchable):
         # todo - pagination generator
         doc = super().search(param_values)
         table = doc.select('table#productTable')[0]
-        heads = tuple(Category.get_heads(table))
-        return Category._get_parts(table, heads)
+        return self._get_parts(table)
