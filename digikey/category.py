@@ -12,12 +12,12 @@ class SortParam(Param):
 
     rex_sort = re.compile(r'sort\(([0-9\-]+)\);')
 
-    def __init__(self, doc, default=None):
+    def __init__(self, title, doc, default=None):
         """
         :param     doc: BeautifulSoup doc of the filter page
         :param default: None, or ('col', bool)
         """
-        super().__init__(title='Column Sort', name='ColumnSort', default=default)
+        super().__init__(title=title, name='ColumnSort', default=default)
 
         # Dict of {title: code}
         self.by = {}
@@ -94,9 +94,10 @@ class Category(Searchable):
         status_head = Category._get_part_status_head(doc)
         price_head = Category._get_price_head(doc)
         page_head = Category._get_page_head(doc)
+        sort_head = Category._get_sort_head(doc)
 
         filters = [UIntParam(page_head, 'pageSize', 25),
-                   SortParam(doc, default=(price_head, True))]
+                   SortParam(sort_head, doc, default=(price_head, True))]
         for head, cell in zip(headers, cells):
             title = head.text
             filt = Filter(title, cell)
@@ -136,6 +137,19 @@ class Category(Searchable):
         # leave out the whitespace and currency.
         return th.text.splitlines()[1].strip()
 
+    @staticmethod
+    def _get_sort_head(doc):
+        """
+        This one is trickier. There's no clear Sort Order text on the page; only
+        Ascending/Descending in the up/down image alt.
+        :param doc: The BS4 doc object to scrape.
+        :return: A reasonable title for sort order. Currently it will take the form
+                 Ascending/Descending (in the configured language).
+        """
+        imgs = doc.select('button.ps-sortButtons > img.sorted')
+        alts = (i.attrs['alt'] for i in imgs[:2])
+        return '/'.join(alts)
+
     @classmethod
     def get_heads(cls, table):
         """
@@ -145,7 +159,7 @@ class Category(Searchable):
         for th in table.select('thead#tblhead > tr:nth-of-type(1) > th'):
             css_cls = th.attrs['class'][0]
             if css_cls == 'th-datasheet':
-                head = 'Datasheet'  # this is shown as an image, no text
+                head = 'Datasheet'  # this is shown as an image, no text. todo - lang-dependent.
             elif 'th-unitPrice' in css_cls:
                 head = cls._title_from_price_head(th)
             else:
