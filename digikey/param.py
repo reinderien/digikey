@@ -236,16 +236,16 @@ class SharedParamFactory:
     def page_size(cls):
         def inner(doc):
             return doc.select('div.results-per-page > span')[0].text.strip()
-        return cls(inner, UIntParam, 'pageSize', 25)
-
+        return cls(inner, UIntParam, 'pageSize', 25)  # can go up to 500
 
 
 SPF = SharedParamFactory  # Abbreviation for convenience
 SHARED_PARAMS = (SPF.checkbox('stock', True),
                  SPF.checkbox('nstock'),
                  SPF.checkbox('newproducts'),
+                 SPF.checkbox('rohs', T=ROHSParam),
                  SPF.media_checkbox('datasheet'),
                  SPF.media_checkbox('photo'),
                  SPF.media_checkbox('cad'),
-                 SPF.checkbox('rohs', T=ROHSParam),
-                 SPF.quantity())
+                 SPF.quantity(),
+                 SPF.page_size())
