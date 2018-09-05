@@ -238,6 +238,13 @@ class SharedParamFactory:
             return doc.select('div.results-per-page > span')[0].text.strip()
         return cls(inner, UIntParam, 'pageSize', 25)  # can go up to 500
 
+    @classmethod
+    def keywords(cls):
+        def inner(doc):
+            elm = doc.find('input', class_='product-search-text')
+            return elm.attrs['placeholder'].rsplit('/', maxsplit=1)[-1]
+        return cls(inner, MultiParam, 'k')
+
 
 SPF = SharedParamFactory  # Abbreviation for convenience
 SHARED_PARAMS = (SPF.checkbox('stock', True),
@@ -248,4 +255,5 @@ SHARED_PARAMS = (SPF.checkbox('stock', True),
                  SPF.media_checkbox('photo'),
                  SPF.media_checkbox('cad'),
                  SPF.quantity(),
-                 SPF.page_size())
+                 SPF.page_size(),
+                 SPF.keywords())
