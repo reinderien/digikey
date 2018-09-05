@@ -1,6 +1,7 @@
 import re
 from bs4 import NavigableString
-from .param import Param, Filter, UIntParam, SharedParamFactory
+from itertools import count
+from .param import Param, Filter, SharedParamFactory
 from .search import Searchable
 
 
@@ -63,6 +64,7 @@ class Category(Searchable):
     """
 
     rex_count = re.compile(r'\((\d+)')
+    rex_page = re.compile(r'(\d+)/(\d+)$')
 
     def __init__(self, session, group, elm):
         """
@@ -87,7 +89,7 @@ class Category(Searchable):
     def _get_addl_params(self):
         print('Initializing search for category %s...' % self.title)
 
-        doc = self.session.get_doc(self.path + '?pageSize=1')
+        doc = self.session.get_doc(self.path, {'pageSize': 1})
         filter_table = doc.find(name='table', class_='filters-group')
         headers = filter_table.select('tr#appliedFilterHeaderRow > th')
         cells = filter_table.select('tr#appliedFilterOptions > td')
@@ -98,11 +100,9 @@ class Category(Searchable):
 
         status_head = self._get_part_status_head(doc)
         price_head = Category._get_price_head(doc)
-        page_head = Category._get_page_head(doc)
         sort_head = Category._get_sort_head(doc)
 
-        filters = [UIntParam(page_head, 'pageSize', 25),
-                   SortParam(self.heads, sort_head, doc, default=(price_head, True))]
+        filters = [SortParam(self.heads, sort_head, doc, default=(price_head, True))]
         for head, cell in zip(headers, cells):
             title = head.text
             filt = Filter(title, cell)
@@ -130,10 +130,6 @@ class Category(Searchable):
         th = doc.select('table#productTable > thead > '
                         'tr:nth-of-type(1) > th.th-unitPrice')[0]
         return cls._title_from_price_head(th)
-
-    @staticmethod
-    def _get_page_head(doc):
-        return doc.select('div.results-per-page > span')[0].text.strip()
 
     @staticmethod
     def _title_from_price_head(th):
@@ -203,7 +199,15 @@ class Category(Searchable):
         :param param_values: A dict of {'param_title': value}
         :return: A generator of the resulting parts.
         """
-        # todo - pagination generator
-        doc = super().search(param_values)
-        table = doc.select('table#productTable')[0]
-        return self._get_parts(table)
+
+        for page in count(1):
+            doc = super().search(param_values, {'page': page})
+            table = doc.select('table#productTable')[0]
+            yield from self._get_parts(table)
+
+            page_text = doc.select('span.current-page')[0].text.strip()
+            this_page, size = Category.rex_page.search(page_text).groups()
+            this_page, size = int(this_page), int(size)
+            assert(this_page == page)
+            if page >= size:
+                break

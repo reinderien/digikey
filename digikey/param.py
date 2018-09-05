@@ -232,6 +232,13 @@ class SharedParamFactory:
             return qty
         return cls(inner, UIntParam, 'quantity', 1)
 
+    @classmethod
+    def page_size(cls):
+        def inner(doc):
+            return doc.select('div.results-per-page > span')[0].text.strip()
+        return cls(inner, UIntParam, 'pageSize', 25)
+
+
 
 SPF = SharedParamFactory  # Abbreviation for convenience
 SHARED_PARAMS = (SPF.checkbox('stock', True),
