@@ -3,18 +3,28 @@
 from digikey import Session
 from pprint import pprint
 
+
+cat_name_en = 'Resistors/Through Hole Resistors'
+cat_name_it = 'Resistori/Resistori da foro passante'
+res_en = 'Resistance'
+res_it = 'Resistenza'
+sess_en_ca = {'country': 'CA'}
+sess_it = {'country': 'IT',
+           'short_lang': 'it',
+           'currency': 'EUR'}
+
+# Change this to change languages
+cat_name, res, sess_args = cat_name_en, res_en, sess_en_ca
+
 d = Session.try_deserialize()
 is_new = d is None
 if is_new:
-    d = Session(country='CA')
+    d = Session(**sess_args)
     d.init_groups()
 
-cat = d.categories['Resistors/Through Hole Resistors']
+cat = d.categories[cat_name]
 if is_new:
     cat.init_params()
-prods = tuple(cat.search({'Resistance': {'500 Ohms'},
-                          'Column Sort': ('Unit Price', True)}))
-
-# prods = d.search({'Keywords': ''})
+prods = tuple(cat.search({res: {'500 Ohms'}}))
 pprint(prods)
 d.serialize()

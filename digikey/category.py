@@ -90,9 +90,11 @@ class Category(Searchable):
         print('Initializing search for category %s...' % self.title)
 
         doc = self.session.get_doc(self.path, {'pageSize': 1})
-        filter_table = doc.find(name='table', class_='filters-group')
-        headers = filter_table.select('tr#appliedFilterHeaderRow > th')
-        cells = filter_table.select('tr#appliedFilterOptions > td')
+
+        # This has changed quite recently - it's now a set of divs instead of a table
+        filter_div = doc.find(name='div', class_='filters-group')
+        headers = filter_div.find_all(name='span', class_='filters-headline')
+        cells = filter_div.find_all(name='select', class_='filter-selectors')
         prod_table = doc.find(name='table', id='productTable')
 
         datasheet_head = SharedParamFactory.label_from(doc, 'datasheet')

@@ -84,7 +84,9 @@ class Session(Searchable):
         depends on there being at least one category already scraped.
         """
         first_cat = next(iter(self.categories.values()))
-        doc = self.get_doc(first_cat.path, {'pageSize': 1})
+
+        # k needed to get the 'deapplySearch' section
+        doc = self.get_doc(first_cat.path, {'pageSize': 1, 'k': 'R'})
         self.shared_params = tuple(f.get(doc) for f in SHARED_PARAMS)
 
         super().init_params()

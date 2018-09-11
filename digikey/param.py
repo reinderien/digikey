@@ -95,13 +95,12 @@ class Filter(MultiParam):
     represented as a dict of {title: internal val}.
     """
 
-    def __init__(self, head, cell, default=None):
+    def __init__(self, head, select, default=None):
         """
         :param    head: The head elm from the filter table
-        :param    cell: The cell elm from the filter table
+        :param  select: The select elm from the filter table
         :param default: Set of default values for this filter, or None
         """
-        select = cell.find(name='select', recursive=False)
         self.options = {o.text.strip(): o.attrs['value']
                         for o in select.find_all(name='option', recursive=False)}
         self.option_titles = set(self.options.keys())
@@ -241,8 +240,12 @@ class SharedParamFactory:
     @classmethod
     def keywords(cls):
         def inner(doc):
-            elm = doc.find('input', class_='product-search-text')
-            return elm.attrs['placeholder'].rsplit('/', maxsplit=1)[-1]
+            # This is currently broken - placeholder has disappeared
+            # elm = doc.find('input', class_='product-search-text')
+            # return elm.attrs['placeholder'].rsplit('/', maxsplit=1)[-1]
+
+            elm = doc.select('div#deapplySearch > label')[0]
+            return elm.text.rstrip(':')
         return cls(inner, MultiParam, 'k')
 
 
