@@ -21,7 +21,7 @@ class Param:
         """
         return True
 
-    def update_qps(self, qps, value=None):
+    def qp_kv(self, value=None):
         """
         Given a dictionary of query parameters, add the value for this param.
         :param qps: Dict of query parameters to be passed to Requests
@@ -30,7 +30,8 @@ class Param:
         if value is None:
             value = self.default
         if value is not None:
-            qps[self.name] = str(value)
+            return self.name, value
+        return None, None
 
 
 class BoolParam(Param):
@@ -41,11 +42,12 @@ class BoolParam(Param):
     def validate(self, value):
         return value in (None, False, True)
 
-    def update_qps(self, qps, value=None):
+    def qp_kv(self, value=None):
         if value is None:
             value = self.default
         if value is not None:
-            qps[self.name] = 1 if value else 0
+            return self.name, 1 if value else 0
+        return None, None
 
 
 class UIntParam(Param):
@@ -78,15 +80,15 @@ class ROHSParam(BoolParam):
     This actually controls two QPs: rohs (True) and nonrohs (False).
     """
 
-    def update_qps(self, qps, value=None):
+    def qp_kv(self, value=None):
         if value is None:
             value = self.default
         if value is None:
-            return
+            return None, None
         name = self.name
         if not value:
             name = 'non' + name
-        qps[name] = '1'
+        return name, '1'
 
 
 class Filter(MultiParam):
@@ -112,11 +114,12 @@ class Filter(MultiParam):
             return True
         return isinstance(value, set) and not (value - self.option_titles)
 
-    def update_qps(self, qps, value=None):
+    def qp_kv(self, value=None):
         if value is None:
             value = self.default
         if value:
-            qps[self.name] = {self.options[v] for v in value}
+            return self.name, {self.options[v] for v in value}
+        return None, None
 
 
 """

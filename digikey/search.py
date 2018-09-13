@@ -21,7 +21,7 @@ class Searchable:
         which may require a GET.
         """
         self.params = {p.title: p for p in
-                       chain(self.session.shared_params, self._get_addl_params())}
+                       chain(self.session.shared_params.values(), self._get_addl_params())}
 
     def search(self, param_values, extra_qps=None):
         """
@@ -47,7 +47,9 @@ class Searchable:
             if not param.validate(value):
                 raise ValueError('"%s" is not a valid value for %s %s' %
                                  (str(value), type(param).__name__, param.title))
-            param.update_qps(qps, value)
+            k, v = param.qp_kv(value)
+            if k:
+                qps[k] = v
         return self.session.get_doc(self.path, qps)
 
     def _get_addl_params(self):

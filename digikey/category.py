@@ -169,29 +169,43 @@ class Category(Searchable):
                 head = th.text.strip()
             yield head
 
-    def _get_parts(self, table):
+    def _get_parts(self, table, filter_qty, qty):
         """
-        :param table: The <table> elm containing search results
-        :return:      A generator of all parts returned
+        :param      table: The <table> elm containing search results
+        :param filter_qty: Bool, whether to filter out rows with invalid min qtys
+        :param        qty: The quantity in the request, to compare with min qty
+        :return:           A generator of all parts returned
         """
         for tr in table.select('tbody#lnkPart > tr'):
             part = {}
             cells = tr.find_all(name='td', recursive=False)
             for head, td in zip(self.heads, cells):
-                update_attr(part, head, td)
-            yield part
+                cls, upd = update_attr(head, td)
+                if filter_qty and cls == 'tr-minQty' and qty is not None:
+                    min_qty = int(next(iter(upd.values())))
+                    if min_qty > qty:  # yes, this happens, and it's silly
+                        break
+                part.update(upd)
+            else:
+                yield part
+                continue
+            break  # Quantity is not OK.
 
-    def search(self, param_values):
+    def search(self, param_values, filter_qty=True):
         """
         Search this category. Calls super() to do the param and request work.
         :param param_values: A dict of {'param_title': value}
-        :return: A generator of the resulting parts.
+        :param   filter_qty: Bool, whether to filter out rows with invalid min qtys
+        :return:             A generator of the resulting parts.
         """
+
+        qty_param = self.session.shared_params['quantity']
+        qty_name, qty = qty_param.qp_kv(param_values.get(qty_param.title))
 
         for page in count(1):
             doc = super().search(param_values, {'page': page})
             table = doc.select('table#productTable')[0]
-            yield from self._get_parts(table)
+            yield from self._get_parts(table, filter_qty, qty)
 
             page_text = doc.select('span.current-page')[0].text.strip()
             this_page, size = Category.rex_page.search(page_text).groups()

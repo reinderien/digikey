@@ -49,7 +49,7 @@ class Session(Searchable):
         self.categories = {}
         self.groups = {}
         self.cache_dir, self.cache_file = Session._cache_defaults(cache_dir, cache_file)
-        self.shared_params = ()  # Not initialized until init_groups()
+        self.shared_params = {}  # Not initialized until init_groups()
         super().__init__(session=self, title='All', path='products/' + short_lang)
 
     @staticmethod
@@ -87,7 +87,9 @@ class Session(Searchable):
 
         # k needed to get the 'deapplySearch' section
         doc = self.get_doc(first_cat.path, {'pageSize': 1, 'k': 'R'})
-        self.shared_params = tuple(f.get(doc) for f in SHARED_PARAMS)
+        for factory in SHARED_PARAMS:
+            param = factory.get(doc)
+            self.shared_params[param.name] = param
 
         super().init_params()
         for g in self.groups.values():
