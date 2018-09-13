@@ -12,11 +12,8 @@ def update_datasheet(part, head, td):
 
 def update_image(part, head, td):
     img = td.find('img')
-    if 'NoPhoto' in img.attrs.get('src', ''):
-        col = None
-    else:
-        col = img.attrs.get('zoomimg')
-    part[head] = col.strip()
+    if 'NoPhoto' not in img.attrs.get('src', ''):
+        part[head] = img.attrs.get('zoomimg')
 
 
 def update_partno(part, head, td):
