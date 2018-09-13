@@ -182,14 +182,12 @@ class Category(Searchable):
             for head, td in zip(self.heads, cells):
                 cls, upd = update_attr(head, td)
                 if filter_qty and cls == 'tr-minQty' and qty is not None:
-                    min_qty = int(next(iter(upd.values())))
+                    min_qty = next(iter(upd.values()))
                     if min_qty > qty:  # yes, this happens, and it's silly
                         break
                 part.update(upd)
             else:
                 yield part
-                continue
-            break  # Quantity is not OK.
 
     def search(self, param_values, filter_qty=True):
         """

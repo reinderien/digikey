@@ -1,3 +1,4 @@
+from locale import setlocale, LC_ALL
 from os import path, mkdir
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
@@ -39,6 +40,7 @@ class Session(Searchable):
         self.country, self.short_lang, self.long_lang, self.tld, self.currency = \
             country, short_lang, long_lang, tld, currency
         self.base = 'https://www.digikey.' + tld
+        self.set_locale()
 
         self._rsession.cookies.update({'SiteForCur': country,
                                        'cur': currency,
@@ -51,6 +53,9 @@ class Session(Searchable):
         self.cache_dir, self.cache_file = Session._cache_defaults(cache_dir, cache_file)
         self.shared_params = {}  # Not initialized until init_groups()
         super().__init__(session=self, title='All', path='products/' + short_lang)
+
+    def set_locale(self):
+        setlocale(LC_ALL, self.long_lang + '.UTF8')
 
     @staticmethod
     def _cache_defaults(cache_dir, cache_file):
@@ -150,4 +155,6 @@ class Session(Searchable):
         if path.isfile(cache_file):
             print('Restoring cached session...')
             with lzma.open(cache_file, 'rb') as f:
-                return pickle.load(f)
+                sess = pickle.load(f)
+                sess.set_locale()
+                return sess

@@ -1,3 +1,6 @@
+from locale import atoi
+
+
 def update_attr(head, td):
     return {head: td.text.strip()}
 
@@ -34,6 +37,12 @@ def update_price(head, td):
     return {head: text.strip()}
 
 
+def update_minqty(head, td):
+    d = update_desktop(head, td)
+    d[head] = atoi(d[head])
+    return d
+
+
 def update_packaging(head, td):
     text = td.find(text=True, recursive=False)
     return {head: text.strip()}
@@ -45,7 +54,7 @@ attrs = {'tr-compareParts': update_compare,
          'tr-dkPartNumber': update_partno,
          'tr-qtyAvailable': update_desktop,
          'tr-unitPrice':    update_price,
-         'tr-minQty':       update_desktop,
+         'tr-minQty':       update_minqty,
          'tr-packaging':    update_packaging}
 
 
