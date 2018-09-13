@@ -1,6 +1,7 @@
 import re
 from bs4 import NavigableString
 from itertools import count
+from .attr import update as update_attr
 from .param import Param, Filter, SharedParamFactory
 from .search import Searchable
 
@@ -154,8 +155,9 @@ class Category(Searchable):
     @classmethod
     def get_heads(cls, table, datasheet_head):
         """
-        :param table: The results <table> elm containing filters
-        :return: A generator of all filter heading strings
+        :param          table: The results <table> elm containing filters
+        :param datasheet_head: The datasheet header text, passed because the header in place is image-only
+        :return:               A generator of all filter heading strings
         """
         for th in table.select('thead#tblhead > tr:nth-of-type(1) > th'):
             css_cls = th.attrs['class'][0]
@@ -170,29 +172,13 @@ class Category(Searchable):
     def _get_parts(self, table):
         """
         :param table: The <table> elm containing search results
-        :param heads: An iterable of all filter headings
-        :return: A generator of all parts returned
+        :return:      A generator of all parts returned
         """
         for tr in table.select('tbody#lnkPart > tr'):
             part = {}
             cells = tr.find_all(name='td', recursive=False)
             for head, td in zip(self.heads, cells):
-                cls = td.attrs['class'][0]
-                if cls == 'tr-datasheet':
-                    col = td.select('a.lnkDatasheet')[0].attrs.get('href')
-                elif cls == 'tr-image':
-                    img = td.find('img')
-                    if 'NoPhoto' in img.attrs.get('src', ''):
-                        col = None
-                    else:
-                        col = img.attrs.get('zoomimg')
-                else:
-                    col = td.text
-                if col and cls != 'tr-compareParts':
-                    part[head] = col.strip()
-                if cls == 'tr-dkPartNumber':
-                    link = td.find('a', recursive=False)
-                    part['Link'] = link.attrs['href']
+                update_attr(part, head, td)
             yield part
 
     def search(self, param_values):
