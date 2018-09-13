@@ -41,13 +41,13 @@ def update_packaging(part, head, td):
 
 
 attrs = {'tr-compareParts': update_compare,
-         'tr-datasheet': update_datasheet,
-         'tr-image': update_image,
+         'tr-datasheet':    update_datasheet,
+         'tr-image':        update_image,
          'tr-dkPartNumber': update_partno,
          'tr-qtyAvailable': update_desktop,
-         'tr-unitPrice': update_price,
-         'tr-minQty': update_desktop,
-         'tr-packaging': update_packaging}
+         'tr-unitPrice':    update_price,
+         'tr-minQty':       update_desktop,
+         'tr-packaging':    update_packaging}
 
 
 def update(part, head, td):
