@@ -93,14 +93,20 @@ class Session(Searchable):
 
     def _bake_cookies(self):
         resp = self._get_resp(self.path)
-        cookie_str = self.COOKIE_RE.search(resp.text)[1]
-        attrs = parse_ns_headers([cookie_str])
+        cookie_match = self.COOKIE_RE.search(resp.text)
+        if not cookie_match:
+            print('No apparent initialization cookie')
+            return
+
+        attrs = parse_ns_headers([cookie_match[1]])
 
         jar: RequestsCookieJar = self._rsession.cookies
         req = MockRequest(resp.request)
         cookies = jar._cookies_from_attrs_set(attrs, req)
         for cookie in cookies:
             jar.set_cookie(cookie)
+
+        print('Cookies set: ' + ', '.join(jar.keys()))
 
     def init_groups(self):
         """
