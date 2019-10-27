@@ -1,9 +1,14 @@
+from http.cookiejar import parse_ns_headers
 from locale import setlocale, LC_ALL
 from os import path, mkdir
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 import lzma
 import pickle
+import re
+
+from requests.cookies import RequestsCookieJar, MockRequest
+
 from .param import SHARED_PARAMS
 from .search import Searchable
 
@@ -14,8 +19,20 @@ class Session(Searchable):
     select sensible cache filenames), you should generally only need one.
     """
 
-    def __init__(self, country='US', short_lang='en', long_lang=None, tld=None, currency=None,
-                 cache_dir=None, cache_file=None):
+    COOKIE_RE = re.compile(
+        re.escape(r'setTimeout(function(){document.cookie="')
+        + r'([^"]+)'
+        + '"'
+    )
+
+    def __init__(self,
+                 country='US',
+                 short_lang='en',
+                 long_lang: str = None,
+                 tld: str = None,
+                 currency: str = None,
+                 cache_dir: str = None,
+                 cache_file: str = None):
         """
         :param    country: Two-letter ("ISO 3166-1 alpha-2") country code; defaults to 'US'.
         :param short_lang: Two-letter ("ISO 639-1") language code; defaults to 'en'.
@@ -31,7 +48,7 @@ class Session(Searchable):
 
         # Some fairly poor guesses
         if not long_lang:
-            long_lang = '%s_%s' % (short_lang, country)
+            long_lang = '%s-%s' % (short_lang, country)
         if not tld:
             tld = 'com' if country == 'US' else country.lower()
         if not currency:
@@ -52,13 +69,15 @@ class Session(Searchable):
         self.groups = {}
         self.cache_dir, self.cache_file = Session._cache_defaults(cache_dir, cache_file)
         self.shared_params = {}  # Not initialized until init_groups()
+
         super().__init__(session=self, title='All', path='products/' + short_lang)
+        self._bake_cookies()
 
     def set_locale(self):
-        setlocale(LC_ALL, self.long_lang + '.UTF8')
+        setlocale(LC_ALL, f'{self.short_lang}_{self.country}.UTF8')
 
     @staticmethod
-    def _cache_defaults(cache_dir, cache_file):
+    def _cache_defaults(cache_dir: str, cache_file: str):
         """
         Select cache dir and filename defaults.
         :param cache_dir: Cache dir name, or None. Will default to '.digikey'.
@@ -71,6 +90,17 @@ class Session(Searchable):
             cache_file = 'session.pickle.xz'
         cache_file = path.join(cache_dir, cache_file)
         return cache_dir, cache_file
+
+    def _bake_cookies(self):
+        resp = self._get_resp(self.path)
+        cookie_str = self.COOKIE_RE.search(resp.text)[1]
+        attrs = parse_ns_headers([cookie_str])
+
+        jar: RequestsCookieJar = self._rsession.cookies
+        req = MockRequest(resp.request)
+        cookies = jar._cookies_from_attrs_set(attrs, req)
+        for cookie in cookies:
+            jar.set_cookie(cookie)
 
     def init_groups(self):
         """
@@ -100,6 +130,12 @@ class Session(Searchable):
         for g in self.groups.values():
             g.init_params()
 
+    def _get_resp(self, upath, qps=None):
+        url = urljoin(self.base, upath)
+        resp = self._rsession.get(url, params=qps)
+        resp.raise_for_status()
+        return resp
+
     def get_doc(self, upath, qps=None):
         """
         Use this session to GET a page at the given path.
@@ -107,9 +143,7 @@ class Session(Searchable):
         :param qps: Query parameters dict (optional)
         :return: A BeautifulSoup parser for the result.
         """
-        url = urljoin(self.base, upath)
-        resp = self._rsession.get(url, params=qps)
-        resp.raise_for_status()
+        resp = self._get_resp(upath, qps)
         return BeautifulSoup(resp.text, 'html.parser')
 
     def search(self, param_values):

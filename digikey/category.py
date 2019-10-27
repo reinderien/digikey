@@ -93,7 +93,7 @@ class Category(Searchable):
         doc = self.session.get_doc(self.path, {'pageSize': 1})
 
         # This has changed quite recently - it's now a set of divs instead of a table
-        filter_div = doc.find(name='div', class_='filters-group')
+        filter_div = doc.find(name='div', id='filters-group')
         headers = filter_div.find_all(name='span', class_='filters-headline')
         cells = filter_div.find_all(name='select', class_='filter-selectors')
         prod_table = doc.find(name='table', id='productTable')

@@ -10,7 +10,12 @@ def update_compare(head, td):
 
 
 def update_datasheet(head, td):
-    return {head: td.select('a.lnkDatasheet')[0].attrs.get('href').strip()}
+    links = td.select('a.lnkDatasheet')
+    if links:
+        link = links[0].attrs.get('href').strip()
+    else:
+        link = None
+    return {head: link}
 
 
 def update_image(head, td):
@@ -39,7 +44,11 @@ def update_price(head, td):
 
 def update_minqty(head, td):
     d = update_desktop(head, td)
-    d[head] = atoi(d[head])
+    # Discard trailing text like:
+    # '1\r\n\r\n                Non-Stock'
+    # todo: add another attribute for non-stock?
+    parts = d[head].split()
+    d[head] = atoi(parts[0])
     return d
 
 

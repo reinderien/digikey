@@ -39,6 +39,9 @@ class Group(Searchable):
         print('Initializing category list...')
         doc = session.get_doc(session.path)
         group_heads = doc.select('div#productIndexList > h2')
+        if not group_heads:
+            raise ValueError('Failed to find product index list.')
+
         for group_head in group_heads:
             yield Group(session, group_head)
 
