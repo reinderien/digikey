@@ -1,9 +1,15 @@
 import re
-from bs4 import NavigableString
+from typing import Iterable, Tuple, List
+
+from bs4 import BeautifulSoup
+from bs4.element import NavigableString, Tag
 from itertools import count
-from .attr import update as update_attr
+
+from digikey.part import Part
+from .attr import update as update_attr, Attr, MinQtyAttr
 from .param import Param, Filter, SharedParamFactory
 from .search import Searchable
+from .session import Session
 
 
 class SortParam(Param):
@@ -14,7 +20,8 @@ class SortParam(Param):
 
     rex_sort = re.compile(r'sort\(([0-9\-]+)\);')
 
-    def __init__(self, heads, title, doc, default=None):
+    def __init__(self, heads: Iterable[str], title: str, doc: BeautifulSoup,
+                 default: Tuple[str, bool] = None):
         """
         :param     doc: BeautifulSoup doc of the filter page
         :param default: None, or ('col', bool)
@@ -40,7 +47,7 @@ class SortParam(Param):
             assert(code > 0)
             self.by[head] = code
 
-    def validate(self, value):
+    def validate(self, value: Tuple[str, bool]) -> bool:
         if value is None:
             return True
         if not isinstance(value, tuple) or len(value) != 2:
@@ -48,7 +55,7 @@ class SortParam(Param):
         by, dirn = value
         return by in self.by and isinstance(dirn, bool)
 
-    def update_qps(self, qps, value=None):
+    def update_qps(self, qps: dict, value: Tuple[str, bool] = None):
         if value is None:
             value = self.default
         title, dirn = value
@@ -67,7 +74,7 @@ class Category(Searchable):
     rex_count = re.compile(r'\((\d+)')
     rex_page = re.compile(r'(\d+)/(\d+)$')
 
-    def __init__(self, session, group, elm):
+    def __init__(self, session: Session, group, elm: Tag):
         """
         :param session: The digikey.session to use for requests
         :param   group: The parent group object
@@ -115,7 +122,7 @@ class Category(Searchable):
             filters.append(filt)
         return filters
 
-    def _get_part_status_head(self, doc):
+    def _get_part_status_head(self, doc: BeautifulSoup) -> str:
         """
         Get the language-variant 'Part Status' heading string
         :param doc: The BS4 doc for the filter page
@@ -129,18 +136,18 @@ class Category(Searchable):
                 return head
 
     @classmethod
-    def _get_price_head(cls, doc):
+    def _get_price_head(cls, doc: BeautifulSoup) -> str:
         th = doc.select('table#productTable > thead > '
                         'tr:nth-of-type(1) > th.th-unitPrice')[0]
         return cls._title_from_price_head(th)
 
     @staticmethod
-    def _title_from_price_head(th):
+    def _title_from_price_head(th: Tag) -> str:
         # leave out the whitespace and currency.
         return th.text.splitlines()[1].strip()
 
     @staticmethod
-    def _get_sort_head(doc):
+    def _get_sort_head(doc: BeautifulSoup) -> str:
         """
         This one is trickier. There's no clear Sort Order text on the page; only
         Ascending/Descending in the up/down image alt.
@@ -153,7 +160,7 @@ class Category(Searchable):
         return '/'.join(alts)
 
     @classmethod
-    def get_heads(cls, table, datasheet_head):
+    def get_heads(cls, table: Tag, datasheet_head: str) -> Iterable[str]:
         """
         :param          table: The results <table> elm containing filters
         :param datasheet_head: The datasheet header text, passed because the header in place is image-only
@@ -169,7 +176,7 @@ class Category(Searchable):
                 head = th.text.strip()
             yield head
 
-    def _get_parts(self, table, filter_qty, qty):
+    def _get_parts(self, table: Tag, filter_qty: bool, qty: int) -> Iterable[Part]:
         """
         :param      table: The <table> elm containing search results
         :param filter_qty: Bool, whether to filter out rows with invalid min qtys
@@ -177,19 +184,22 @@ class Category(Searchable):
         :return:           A generator of all parts returned
         """
         for tr in table.select('tbody#lnkPart > tr'):
-            part = {}
+            attrs = []
             cells = tr.find_all(name='td', recursive=False)
             for head, td in zip(self.heads, cells):
-                cls, upd = update_attr(head, td)
-                if filter_qty and cls == 'tr-minQty' and qty is not None:
-                    min_qty = next(iter(upd.values()))
-                    if min_qty > qty:  # yes, this happens, and it's silly
-                        break
-                part.update(upd)
+                attr = update_attr(head, td)
+                if (
+                    filter_qty
+                    and qty is not None
+                    and isinstance(attr, MinQtyAttr)
+                    and attr.value > qty  # yes, this happens, and it's silly
+                ):
+                    break
+                attrs.append(attr)
             else:
-                yield part
+                yield Part(attrs)
 
-    def search(self, param_values, filter_qty=True):
+    def search(self, param_values: dict, filter_qty=True) -> Iterable[Part]:
         """
         Search this category. Calls super() to do the param and request work.
         :param param_values: A dict of {'param_title': value}

@@ -1,9 +1,12 @@
+from typing import Union
+
+
 class Param:
     """
     Top-level parent class for search parameters.
     """
 
-    def __init__(self, title, name, default=None):
+    def __init__(self, title: str, name: str, default=None):
         """
         :param   title: Human-legible parameter title
         :param    name: Internal name
@@ -11,7 +14,7 @@ class Param:
         """
         self.title, self.name, self.default = title, name, default
 
-    def validate(self, value):
+    def validate(self, value: Union[str, None]):
         """
         Validate this parameter. 'None' should be acceptable and indicates 'unspecified'. No
         exception should be thrown from this method. This method is overridden in other parameter

@@ -26,5 +26,5 @@ cat = d.categories[cat_name]
 if is_new:
     cat.init_params()
 prods = tuple(cat.search({res: {'500 Ohms'}}))
-pprint(prods)
+print('\n'.join(sorted(str(p) for p in prods)))
 d.serialize()

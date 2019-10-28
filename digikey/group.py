@@ -1,5 +1,10 @@
+from typing import Iterable
+
+from bs4.element import Tag
+
 from .category import Category
 from .search import Searchable
+from .session import Session
 
 
 class Group(Searchable):
@@ -9,7 +14,7 @@ class Group(Searchable):
     coding it. At least we cache these.
     """
 
-    def __init__(self, session, elm):
+    def __init__(self, session: Session, elm: Tag):
         """
         This constructor should only be called internally to Group.
         :param session: The session, for requests.
@@ -19,7 +24,7 @@ class Group(Searchable):
         self.categories = {c.short_title: c for c in self._get_categories(elm)}
         self.size = sum(c.size for c in self.categories.values())
 
-    def _get_categories(self, group_elm):
+    def _get_categories(self, group_elm: Tag) -> Iterable[Category]:
         """
         Initialize the categories for this group via scraping.
         :param group_elm: The group's <h2>
@@ -30,7 +35,7 @@ class Group(Searchable):
             yield Category(self.session, self, cat_item)
 
     @staticmethod
-    def get_all(session):
+    def get_all(session: Session) -> Iterable:
         """
         Get all groups.
         :param session: The session to use for requests.

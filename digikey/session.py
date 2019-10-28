@@ -1,6 +1,7 @@
 from http.cookiejar import parse_ns_headers
 from locale import setlocale, LC_ALL
-from os import path, mkdir
+from pathlib import Path
+from typing import Union
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 import lzma
@@ -77,7 +78,8 @@ class Session(Searchable):
         setlocale(LC_ALL, f'{self.short_lang}_{self.country}.UTF8')
 
     @staticmethod
-    def _cache_defaults(cache_dir: str, cache_file: str):
+    def _cache_defaults(cache_dir: Union[Path, str] = None,
+                        cache_file: str = None) -> (Path, Path):
         """
         Select cache dir and filename defaults.
         :param cache_dir: Cache dir name, or None. Will default to '.digikey'.
@@ -88,7 +90,10 @@ class Session(Searchable):
             cache_dir = '.digikey'
         if not cache_file:
             cache_file = 'session.pickle.xz'
-        cache_file = path.join(cache_dir, cache_file)
+        if not isinstance(cache_dir, Path):
+            cache_dir = Path(cache_dir)
+
+        cache_file = cache_dir / cache_file
         return cache_dir, cache_file
 
     def _bake_cookies(self):
@@ -136,13 +141,13 @@ class Session(Searchable):
         for g in self.groups.values():
             g.init_params()
 
-    def _get_resp(self, upath, qps=None):
+    def _get_resp(self, upath: str, qps: dict = None):
         url = urljoin(self.base, upath)
         resp = self._rsession.get(url, params=qps)
         resp.raise_for_status()
         return resp
 
-    def get_doc(self, upath, qps=None):
+    def get_doc(self, upath: str, qps: dict = None):
         """
         Use this session to GET a page at the given path.
         :param upath: Path component of the URL
@@ -152,7 +157,7 @@ class Session(Searchable):
         resp = self._get_resp(upath, qps)
         return BeautifulSoup(resp.text, 'html.parser')
 
-    def search(self, param_values):
+    def search(self, param_values: dict):
         """
         Search at the top level. Currently not implemented. todo.
         :param param_values: A dictionary of {param name: value}
@@ -174,8 +179,8 @@ class Session(Searchable):
 
         The metadata are pickled and xz-compressed.
         """
-        if not path.isdir(self.cache_dir):
-            mkdir(self.cache_dir)
+        if not self.cache_dir.exists():
+            self.cache_dir.mkdir()
         '''
         The session has references to both categories and groups
         Categories have references to params if init_params has been called
@@ -184,7 +189,8 @@ class Session(Searchable):
             pickle.dump(self, f)
 
     @staticmethod
-    def try_deserialize(cache_dir=None, cache_file=None):
+    def try_deserialize(cache_dir: Union[Path, str] = None,
+                        cache_file: str = None):
         """
         Try to load a Session instance from a cache file. The constructor is not called.
         :param  cache_dir: Directory from which metadata are read. Defaults to '.digikey'.
@@ -192,7 +198,7 @@ class Session(Searchable):
         :return: A Session instance, if the cache exists. None if the cache does not exist.
         """
         cache_dir, cache_file = Session._cache_defaults(cache_dir, cache_file)
-        if path.isfile(cache_file):
+        if cache_file.is_file():
             print('Restoring cached session...')
             with lzma.open(cache_file, 'rb') as f:
                 sess = pickle.load(f)
