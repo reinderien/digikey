@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 from digikey import Session
-from pprint import pprint
 
 
 cat_name_en = 'Resistors/Through Hole Resistors'
@@ -16,15 +15,17 @@ sess_it = {'country': 'IT',
 # Change this to change languages
 cat_name, res, sess_args = cat_name_en, res_en, sess_en_ca
 
-d = Session.try_deserialize()
-is_new = d is None
+d, is_new = Session.try_deserialize(**sess_args)
 if is_new:
-    d = Session(**sess_args)
+    print('New session created')
     d.init_groups()
+else:
+    print('Session restored from cache')
 
 cat = d.categories[cat_name]
 if is_new:
     cat.init_params()
+
 prods = tuple(cat.search({res: {'500 Ohms'}}))
 print('\n'.join(sorted(str(p) for p in prods)))
 d.serialize()

@@ -1,7 +1,7 @@
 from http.cookiejar import parse_ns_headers
 from locale import setlocale, LC_ALL
 from pathlib import Path
-from typing import Union
+from typing import Union, Dict, Tuple
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 import lzma
@@ -26,14 +26,14 @@ class Session(Searchable):
         + '"'
     )
 
-    def __init__(self,
-                 country='US',
-                 short_lang='en',
-                 long_lang: str = None,
-                 tld: str = None,
-                 currency: str = None,
-                 cache_dir: str = None,
-                 cache_file: str = None):
+    def __init__(
+        self,
+        country='US',
+        short_lang='en',
+        long_lang: str = None,
+        tld: str = None,
+        currency: str = None,
+    ):
         """
         :param    country: Two-letter ("ISO 3166-1 alpha-2") country code; defaults to 'US'.
         :param short_lang: Two-letter ("ISO 639-1") language code; defaults to 'en'.
@@ -41,12 +41,31 @@ class Session(Searchable):
         :param        tld: Top-level domain suffix to 'digikey' hostname; defaults to 'com' if
                            country is US, or the country otherwise.
         :param   currency: ISO 4217 code. As a poor approximation, this defaults to {country} + 'D'.
-        :param  cache_dir: Place to store metadata cache. Defaults to '.digikey'.
-        :param cache_file: Name of metadata cache file. Defaults to 'session.pickle.xz'.
         """
         from requests import Session as RSession
         self._rsession = RSession()
 
+        self.country, self.short_lang, self.long_lang, self.tld, self.currency = \
+            self._lang_defaults(country, short_lang, long_lang, tld, currency)
+        self.base = 'https://www.digikey.' + self.tld
+        self.set_locale()
+
+        self._rsession.cookies.update({'SiteForCur': country,
+                                       'cur': self.currency,
+                                       'website#lang': self.long_lang})
+        self._rsession.headers.update({'Accept-Language': '%s,%s;q=0.9' % (self.long_lang, self.short_lang),
+                                       'Referer': self.base,
+                                       'User-Agent': 'Mozilla/5.0'})
+        self.categories = {}
+        self.groups = {}
+        self.shared_params = {}  # Not initialized until init_groups()
+
+        super().__init__(session=self, title='All', path='products/' + self.short_lang)
+        self._bake_cookies()
+
+    @staticmethod
+    def _lang_defaults(country, short_lang, long_lang, tld, currency) -> (
+            str, str, str, str, str):
         # Some fairly poor guesses
         if not long_lang:
             long_lang = '%s-%s' % (short_lang, country)
@@ -54,46 +73,35 @@ class Session(Searchable):
             tld = 'com' if country == 'US' else country.lower()
         if not currency:
             currency = country + 'D'
-
-        self.country, self.short_lang, self.long_lang, self.tld, self.currency = \
-            country, short_lang, long_lang, tld, currency
-        self.base = 'https://www.digikey.' + tld
-        self.set_locale()
-
-        self._rsession.cookies.update({'SiteForCur': country,
-                                       'cur': currency,
-                                       'website#lang': long_lang})
-        self._rsession.headers.update({'Accept-Language': '%s,%s;q=0.9' % (long_lang, short_lang),
-                                       'Referer': self.base,
-                                       'User-Agent': 'Mozilla/5.0'})
-        self.categories = {}
-        self.groups = {}
-        self.cache_dir, self.cache_file = Session._cache_defaults(cache_dir, cache_file)
-        self.shared_params = {}  # Not initialized until init_groups()
-
-        super().__init__(session=self, title='All', path='products/' + short_lang)
-        self._bake_cookies()
+        return country, short_lang, long_lang, tld, currency
 
     def set_locale(self):
         setlocale(LC_ALL, f'{self.short_lang}_{self.country}.UTF8')
 
-    @staticmethod
-    def _cache_defaults(cache_dir: Union[Path, str] = None,
-                        cache_file: str = None) -> (Path, Path):
+    @classmethod
+    def _cache_defaults(
+            cls,
+            cache_dir: Union[Path, str] = None,
+            country='US',
+            short_lang='en',
+            long_lang: str = None,
+            tld: str = None,
+            currency: str = None,
+        ) -> (Path, Path):
         """
         Select cache dir and filename defaults.
         :param cache_dir: Cache dir name, or None. Will default to '.digikey'.
-        :param cache_file: Cache filename, or None. Will default to 'session.pickle.xz'.
         :return: cache_dir, cache_file.
         """
         if not cache_dir:
             cache_dir = '.digikey'
-        if not cache_file:
-            cache_file = 'session.pickle.xz'
         if not isinstance(cache_dir, Path):
             cache_dir = Path(cache_dir)
 
-        cache_file = cache_dir / cache_file
+        country, short_lang, long_lang, tld, currency = cls._lang_defaults(
+            country, short_lang, long_lang, tld, currency
+        )
+        cache_file = cache_dir / f'{short_lang}_{country}_{long_lang}_{tld}_{currency}.xz'
         return cache_dir, cache_file
 
     def _bake_cookies(self):
@@ -167,7 +175,7 @@ class Session(Searchable):
         # Might go to a category page, or to a group list
         raise NotImplemented()
 
-    def serialize(self):
+    def serialize(self, cache_dir: Union[Path, str] = None):
         """
         Cache this object in the file at {cache_dir}/{cache_file} as given in the constructor.
         This will save metadata including:
@@ -178,29 +186,38 @@ class Session(Searchable):
         - i18n settings (language, country, currency)
 
         The metadata are pickled and xz-compressed.
+
+        :param  cache_dir: Place to store metadata cache. Defaults to '.digikey'.
         """
-        if not self.cache_dir.exists():
-            self.cache_dir.mkdir()
+        cache_dir, cache_file = Session._cache_defaults(
+            cache_dir,
+            self.country, self.short_lang, self.long_lang, self.tld, self.currency
+        )
+        if not cache_dir.exists():
+            cache_dir.mkdir()
         '''
         The session has references to both categories and groups
         Categories have references to params if init_params has been called
         '''
-        with lzma.open(self.cache_file, 'wb') as f:
+        with lzma.open(cache_file, 'wb') as f:
             pickle.dump(self, f)
 
     @staticmethod
-    def try_deserialize(cache_dir: Union[Path, str] = None,
-                        cache_file: str = None):
+    def try_deserialize(
+        cache_dir: Union[Path, str] = None,
+        **kwargs
+    ) -> (object, bool):
         """
         Try to load a Session instance from a cache file. The constructor is not called.
         :param  cache_dir: Directory from which metadata are read. Defaults to '.digikey'.
         :param cache_file: Name of metadata cache file. Defaults to 'session.pickle.xz'.
         :return: A Session instance, if the cache exists. None if the cache does not exist.
         """
-        cache_dir, cache_file = Session._cache_defaults(cache_dir, cache_file)
-        if cache_file.is_file():
-            print('Restoring cached session...')
-            with lzma.open(cache_file, 'rb') as f:
-                sess = pickle.load(f)
-                sess.set_locale()
-                return sess
+        cache_dir, cache_file = Session._cache_defaults(cache_dir, **kwargs)
+        if not cache_file.is_file():
+            return Session(**kwargs), True
+
+        with lzma.open(cache_file, 'rb') as f:
+            sess: Session = pickle.load(f)
+        sess.set_locale()
+        return sess, False
