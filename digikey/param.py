@@ -1,4 +1,7 @@
-from typing import Union
+from typing import Union, Callable, Type
+
+from bs4 import BeautifulSoup
+from bs4.element import Tag
 
 
 class Param:
@@ -14,7 +17,7 @@ class Param:
         """
         self.title, self.name, self.default = title, name, default
 
-    def validate(self, value: Union[str, None]):
+    def validate(self, value: Union[str, None]) -> bool:
         """
         Validate this parameter. 'None' should be acceptable and indicates 'unspecified'. No
         exception should be thrown from this method. This method is overridden in other parameter
@@ -24,10 +27,9 @@ class Param:
         """
         return True
 
-    def qp_kv(self, value=None):
+    def qp_kv(self, value=None) -> (str, object):
         """
         Given a dictionary of query parameters, add the value for this param.
-        :param qps: Dict of query parameters to be passed to Requests
         :param value: Value to add. Will only be added if not None.
         """
         if value is None:
@@ -42,10 +44,10 @@ class BoolParam(Param):
     Boolean search parameter. Internally maps (False, True) to (0, 1).
     """
 
-    def validate(self, value):
+    def validate(self, value) -> bool:
         return value in (None, False, True)
 
-    def qp_kv(self, value=None):
+    def qp_kv(self, value=None) -> (str, object):
         if value is None:
             value = self.default
         if value is not None:
@@ -58,7 +60,7 @@ class UIntParam(Param):
     Unsigned integer search parameter.
     """
 
-    def validate(self, value):
+    def validate(self, value) -> bool:
         return (value is None) or (isinstance(value, int) and value >= 0)
 
 
@@ -68,7 +70,7 @@ class MultiParam(Param):
     this to k=v1&k=v2&k=v3...
     """
 
-    def validate(self, value):
+    def validate(self, value) -> bool:
         if value is None:
             return True  # None means unspecified; this is fine
         try:
@@ -83,7 +85,7 @@ class ROHSParam(BoolParam):
     This actually controls two QPs: rohs (True) and nonrohs (False).
     """
 
-    def qp_kv(self, value=None):
+    def qp_kv(self, value=None) -> (str, object):
         if value is None:
             value = self.default
         if value is None:
@@ -100,9 +102,9 @@ class Filter(MultiParam):
     represented as a dict of {title: internal val}.
     """
 
-    def __init__(self, head, select, default=None):
+    def __init__(self, head: str, select: Tag, default=None):
         """
-        :param    head: The head elm from the filter table
+        :param    head: The head elm text from the filter table
         :param  select: The select elm from the filter table
         :param default: Set of default values for this filter, or None
         """
@@ -112,12 +114,12 @@ class Filter(MultiParam):
         super().__init__(title=head, name=select.attrs['name'], default=default)
         # todo - deal with min/max selection
 
-    def validate(self, value):
+    def validate(self, value: set) -> bool:
         if value is None:
             return True
         return isinstance(value, set) and not (value - self.option_titles)
 
-    def qp_kv(self, value=None):
+    def qp_kv(self, value=None) -> (str, object):
         if value is None:
             value = self.default
         if value:
@@ -161,26 +163,32 @@ class SharedParamFactory:
     and create a Param instance with an appropriate title field.
     """
 
-    def __init__(self, get_title, T, name, default=None):
+    def __init__(
+            self,
+            get_title: Callable[[BeautifulSoup], str],
+            param_t: Type[Param],
+            name: str,
+            default=None
+    ):
         """
         :param get_title: A method that accepts a BS4 doc and returns a title string.
-        :param         T: The type of Param to create.
+        :param   param_t: The type of Param to create.
         :param      name: The query parameter name.
         :param   default: The default for the Param's value to take, or None.
         """
-        self.T, self.name, self.get_title, self.default = T, name, get_title, default
+        self.param_t, self.name, self.get_title, self.default = param_t, name, get_title, default
 
-    def get(self, doc):
+    def get(self, doc: BeautifulSoup) -> Param:
         """
         Scrape the doc for the title, and instantiate the Param.
         :param doc: The BS4 doc to scrape.
         :return: A Param subclass instance (of type 'T').
         """
         title = self.get_title(doc)
-        return self.T(title, self.name, self.default)
+        return self.param_t(title, self.name, self.default)
 
     @staticmethod
-    def label_from(doc, name):
+    def label_from(doc: BeautifulSoup, name: str) -> str:
         """
         :param  doc: The BS4 doc to scrape.
         :param name: The name of a checkbox input in the DOM.
@@ -189,22 +197,22 @@ class SharedParamFactory:
         return doc.find('label', attrs={'for': name}).text.strip()
 
     @classmethod
-    def checkbox(cls, name, default=None, T=BoolParam):
+    def checkbox(cls, name: str, default=None, param_t=BoolParam):
         """
         Set up an SPF instance that will find a checkbox input named 'name' in the DOM, find the
         corresponding label, and use the text of that label for the resultant Param's title.
         :param    name: The name of the checkbox input (also the name of the eventual QP)
         :param default: The default for the resultant Param to use
-        :param       T: The subclass of Param to instantiate; defaults to BoolParam
+        :param       param_t: The subclass of Param to instantiate; defaults to BoolParam
         :return:        An instance of SPF.
         """
         def inner(doc):
             return cls.label_from(doc, name)
 
-        return cls(inner, T, name, default)
+        return cls(inner, param_t, name, default)
 
     @classmethod
-    def media_checkbox(cls, name, default=None):
+    def media_checkbox(cls, name: str, default=None):
         """
         Set up an SPF instance that will find a checkbox input named 'name' in the DOM. This is
         expected to be a part of the 'Media Available' section on the filter page. The resultant
@@ -259,7 +267,7 @@ SPF = SharedParamFactory  # Abbreviation for convenience
 SHARED_PARAMS = (SPF.checkbox('stock', True),
                  SPF.checkbox('nstock'),
                  SPF.checkbox('newproducts'),
-                 SPF.checkbox('rohs', T=ROHSParam),
+                 SPF.checkbox('rohs', param_t=ROHSParam),
                  SPF.media_checkbox('datasheet'),
                  SPF.media_checkbox('photo'),
                  SPF.media_checkbox('cad'),

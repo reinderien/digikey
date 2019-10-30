@@ -1,4 +1,4 @@
-from typing import Iterable
+from typing import Iterable, Dict
 
 from bs4.element import Tag
 
@@ -21,8 +21,8 @@ class Group(Searchable):
         :param elm: The <h2> associated with this group.
         """
         super().__init__(session=session, title=elm.text, path=elm.find(name='a').attrs['href'])
-        self.categories = {c.short_title: c for c in self._get_categories(elm)}
-        self.size = sum(c.size for c in self.categories.values())
+        self.categories: Dict[str, Category] = {c.short_title: c for c in self._get_categories(elm)}
+        self.size: int = sum(c.size for c in self.categories.values())
 
     def _get_categories(self, group_elm: Tag) -> Iterable[Category]:
         """
@@ -35,7 +35,7 @@ class Group(Searchable):
             yield Category(self.session, self, cat_item)
 
     @staticmethod
-    def get_all(session: Session) -> Iterable:
+    def get_all(session: Session) -> Iterable['Group']:
         """
         Get all groups.
         :param session: The session to use for requests.
@@ -50,7 +50,7 @@ class Group(Searchable):
         for group_head in group_heads:
             yield Group(session, group_head)
 
-    def search(self, param_values):
+    def search(self, param_values: Dict[str, object]):
         """
         Search the whole group. Currently not implemented. todo.
         :param param_values: Dict of search parameters.

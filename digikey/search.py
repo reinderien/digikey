@@ -1,7 +1,13 @@
 from itertools import chain
-from typing import Tuple, Iterable
+from typing import Iterable, Dict, TYPE_CHECKING
 
 from bs4 import BeautifulSoup
+
+from .param import Param
+
+if TYPE_CHECKING:
+    from . import Session
+    from .param import Param
 
 
 class Searchable:
@@ -9,14 +15,15 @@ class Searchable:
     Top-level parent class for all searchable areas in DigiKey.
     """
 
-    def __init__(self, session, title: str, path: str):
+    def __init__(self, session: 'Session', title: str, path: str):
         """
         :param session: session object, to use for requests
         :param   title: title string, to use during status output
         :param    path: URL path portion associated with this searchable area
         """
-        self.session, self.title, self.path = session, title, path
-        self.params: dict = None
+        self.session = session
+        self.title, self.path = title, path
+        self.params: Dict[str, Param] = {}
 
     def init_params(self):
         """
@@ -26,7 +33,7 @@ class Searchable:
         self.params = {p.title: p for p in
                        chain(self.session.shared_params.values(), self._get_addl_params())}
 
-    def search(self, param_values: dict, extra_qps: dict = None) -> BeautifulSoup:
+    def search(self, param_values: Dict[str, object], extra_qps: dict = None) -> BeautifulSoup:
         """
         :param param_values: A dictionary of {param name: value}. Each value must be valid for its
                              parameter.
@@ -55,7 +62,7 @@ class Searchable:
                 qps[k] = v
         return self.session.get_doc(self.path, qps)
 
-    def _get_addl_params(self) -> Iterable[Tuple[str, str]]:
+    def _get_addl_params(self) -> Iterable[Param]:
         """
         Get additional parameters applicable to this search area. By default, the parent simply
         returns an empty tuple.

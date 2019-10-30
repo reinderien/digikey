@@ -1,17 +1,22 @@
+from bs4 import BeautifulSoup
 from http.cookiejar import parse_ns_headers
 from locale import setlocale, LC_ALL
 from pathlib import Path
-from typing import Union, Dict, Tuple
+from requests.cookies import RequestsCookieJar, MockRequest
+from requests.models import Response
+from typing import Union, Dict, TYPE_CHECKING
 from urllib.parse import urljoin
-from bs4 import BeautifulSoup
 import lzma
 import pickle
 import re
 
-from requests.cookies import RequestsCookieJar, MockRequest
-
 from .param import SHARED_PARAMS
 from .search import Searchable
+
+if TYPE_CHECKING:
+    from .category import Category
+    from .group import Group
+    from .param import Param
 
 
 class Session(Searchable):
@@ -56,15 +61,20 @@ class Session(Searchable):
         self._rsession.headers.update({'Accept-Language': '%s,%s;q=0.9' % (self.long_lang, self.short_lang),
                                        'Referer': self.base,
                                        'User-Agent': 'Mozilla/5.0'})
-        self.categories = {}
-        self.groups = {}
-        self.shared_params = {}  # Not initialized until init_groups()
+        self.groups: Dict[str, Group] = {}
+        self.categories: Dict[str, Category] = {}
+        self.shared_params: Dict[str, Param] = {}  # Not initialized until init_groups()
 
         super().__init__(session=self, title='All', path='products/' + self.short_lang)
         self._bake_cookies()
 
     @staticmethod
-    def _lang_defaults(country, short_lang, long_lang, tld, currency) -> (
+    def _lang_defaults(
+            country: str,
+            short_lang: str,
+            long_lang: str,
+            tld: str,
+            currency: str) -> (
             str, str, str, str, str):
         # Some fairly poor guesses
         if not long_lang:
@@ -80,14 +90,14 @@ class Session(Searchable):
 
     @classmethod
     def _cache_defaults(
-            cls,
-            cache_dir: Union[Path, str] = None,
-            country='US',
-            short_lang='en',
-            long_lang: str = None,
-            tld: str = None,
-            currency: str = None,
-        ) -> (Path, Path):
+        cls,
+        cache_dir: Union[Path, str] = None,
+        country='US',
+        short_lang='en',
+        long_lang: str = None,
+        tld: str = None,
+        currency: str = None,
+    ) -> (Path, Path):
         """
         Select cache dir and filename defaults.
         :param cache_dir: Cache dir name, or None. Will default to '.digikey'.
@@ -149,13 +159,13 @@ class Session(Searchable):
         for g in self.groups.values():
             g.init_params()
 
-    def _get_resp(self, upath: str, qps: dict = None):
+    def _get_resp(self, upath: str, qps: dict = None) -> Response:
         url = urljoin(self.base, upath)
         resp = self._rsession.get(url, params=qps)
         resp.raise_for_status()
         return resp
 
-    def get_doc(self, upath: str, qps: dict = None):
+    def get_doc(self, upath: str, qps: dict = None) -> BeautifulSoup:
         """
         Use this session to GET a page at the given path.
         :param upath: Path component of the URL
@@ -165,7 +175,7 @@ class Session(Searchable):
         resp = self._get_resp(upath, qps)
         return BeautifulSoup(resp.text, 'html.parser')
 
-    def search(self, param_values: dict):
+    def search(self, param_values: Dict[str, object]):
         """
         Search at the top level. Currently not implemented. todo.
         :param param_values: A dictionary of {param name: value}
@@ -202,20 +212,22 @@ class Session(Searchable):
         with lzma.open(cache_file, 'wb') as f:
             pickle.dump(self, f)
 
-    @staticmethod
+    @classmethod
     def try_deserialize(
+        cls,
         cache_dir: Union[Path, str] = None,
         **kwargs
-    ) -> (object, bool):
+    ) -> ('Session', bool):
         """
         Try to load a Session instance from a cache file. The constructor is not called.
-        :param  cache_dir: Directory from which metadata are read. Defaults to '.digikey'.
-        :param cache_file: Name of metadata cache file. Defaults to 'session.pickle.xz'.
-        :return: A Session instance, if the cache exists. None if the cache does not exist.
+        :param cache_dir: Directory from which metadata are read. Defaults to '.digikey'.
+        :param    kwargs: Locale arguments passed to the Session constructor.
+        :return: A Session instance, if the cache exists, a new Session if the cache does not exist;
+                 and a boolean - True if the session is new, False if cached.
         """
-        cache_dir, cache_file = Session._cache_defaults(cache_dir, **kwargs)
+        cache_dir, cache_file = cls._cache_defaults(cache_dir, **kwargs)
         if not cache_file.is_file():
-            return Session(**kwargs), True
+            return cls(**kwargs), True
 
         with lzma.open(cache_file, 'rb') as f:
             sess: Session = pickle.load(f)

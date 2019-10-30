@@ -3,6 +3,7 @@ from locale import atoi, atof
 from typing import Type, Dict
 
 from bs4.element import Tag
+from .types import OptionalStr
 
 
 class Attr:
@@ -16,7 +17,7 @@ class Attr:
 class BasicAttr(Attr):
     def __init__(self, name: str, title: str, td: Tag):
         super().__init__(title)
-        self.value = td.text.strip()
+        self.value: str = td.text.strip()
 
 
 class DefaultAttr(BasicAttr):
@@ -39,8 +40,9 @@ class DatasheetAttr(Attr):
     def __init__(self, name: str, title: str, td: Tag):
         super().__init__(title)
         links = td.select('a.lnkDatasheet')
+
         if links:
-            self.link = links[0].attrs.get('href').strip()
+            self.link: OptionalStr = links[0].attrs.get('href').strip()
         else:
             self.link = None
 
@@ -52,9 +54,9 @@ class ImageAttr(Attr):
         super().__init__(title)
         img = td.find('img')
         if 'NoPhoto' in img.attrs.get('src', ''):
-            self.value: str = None
+            self.link: OptionalStr = None
         else:
-            self.value = img.attrs.get('zoomimg')
+            self.link = img.attrs.get('zoomimg')
 
 
 class PartNoAttr(Attr):
@@ -69,7 +71,7 @@ class PartNoAttr(Attr):
 
         rohs = td.find('img', class_='rohs-foilage')
         if rohs:
-            self.rohs = rohs.attrs['alt']
+            self.rohs: OptionalStr = rohs.attrs['alt']
         else:
             self.rohs = None
 
@@ -90,7 +92,7 @@ class AbstractDesktopAttr(Attr):
     def __init__(self, name: str, title: str, td: Tag):
         super().__init__(title)
         sp = td.find('span', class_='desktop')
-        self.value = sp.text.strip()
+        self._raw: str = sp.text.strip()
 
 
 class QtyAvailAttr(AbstractDesktopAttr):
@@ -98,9 +100,10 @@ class QtyAvailAttr(AbstractDesktopAttr):
 
     def __init__(self, name: str, title: str, td: Tag):
         super().__init__(name, title, td)
-        parts = self.value.split('-')
-        value, self.availability = (p.strip() for p in parts)
-        self.value = atoi(value)
+        parts = self._raw.split('-')
+        value, avail = (p.strip() for p in parts)
+        self.value: int = atoi(value)
+        self.availability: str = avail
 
 
 class PriceAttr(Attr):
@@ -110,8 +113,9 @@ class PriceAttr(Attr):
     def __init__(self, name: str, title: str, td: Tag):
         super().__init__(title)
         text = td.find('span').find(text=True, recursive=False)
-        self.curr, value = self.CURR_RE.match(text.strip()).groups()
-        self.value = atof(value)
+        curr, value = self.CURR_RE.match(text.strip()).groups()
+        self.curr: str = curr
+        self.value: float = atof(value)
 
 
 class MinQtyAttr(AbstractDesktopAttr):
@@ -120,13 +124,13 @@ class MinQtyAttr(AbstractDesktopAttr):
     def __init__(self, name: str, title: str, td: Tag):
         super().__init__(name, title, td)
 
-        parts = self.value.split()
-        self.value = atoi(parts[0])
+        parts = self._raw.split()
+        self.value: int = atoi(parts[0])
 
         if len(parts) > 1:
-            self.stock_title = parts[1]
+            self.stock_title: OptionalStr = parts[1]
         else:
-            self.stock_title: str = None
+            self.stock_title = None
 
 
 class PackagingAttr(Attr):
@@ -134,27 +138,29 @@ class PackagingAttr(Attr):
 
     def __init__(self, name: str, title: str, td: Tag):
         super().__init__(title)
-        self.value = td.find(text=True, recursive=False).strip()
+        self.value: str = td.find(text=True, recursive=False).strip()
 
 
 class SeriesAttr(BasicAttr):
     NAME = 'series'
 
 
-_attrs: Dict[str, Type[Attr]] = {T.NAME: T for T in (
-    CompareAttr,
-    DatasheetAttr,
-    ImageAttr,
-    PartNoAttr,
-    MfgPartNoAttr,
-    VendorAttr,
-    DescriptionAttr,
-    QtyAvailAttr,
-    PriceAttr,
-    MinQtyAttr,
-    PackagingAttr,
-    SeriesAttr,
-)}
+_attrs: Dict[str, Type[Attr]] = {
+    T.NAME: T for T in (
+        CompareAttr,
+        DatasheetAttr,
+        ImageAttr,
+        PartNoAttr,
+        MfgPartNoAttr,
+        VendorAttr,
+        DescriptionAttr,
+        QtyAvailAttr,
+        PriceAttr,
+        MinQtyAttr,
+        PackagingAttr,
+        SeriesAttr,
+    )
+}
 
 
 def update(head: str, td: Tag) -> Attr:

@@ -1,15 +1,18 @@
 import re
-from typing import Iterable, Tuple, List
 
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
 from itertools import count
+from typing import Iterable, Dict, Tuple, TYPE_CHECKING
 
-from digikey.part import Part
-from .attr import update as update_attr, Attr, MinQtyAttr
+from .attr import update as update_attr, MinQtyAttr
 from .param import Param, Filter, SharedParamFactory
+from .part import Part
 from .search import Searchable
 from .session import Session
+
+if TYPE_CHECKING:
+    from .group import Group
 
 
 class SortParam(Param):
@@ -21,7 +24,7 @@ class SortParam(Param):
     rex_sort = re.compile(r'sort\(([0-9\-]+)\);')
 
     def __init__(self, heads: Iterable[str], title: str, doc: BeautifulSoup,
-                 default: Tuple[str, bool] = None):
+                 default: (str, bool) = None):
         """
         :param     doc: BeautifulSoup doc of the filter page
         :param default: None, or ('col', bool)
@@ -29,7 +32,7 @@ class SortParam(Param):
         super().__init__(title=title, name='ColumnSort', default=default)
 
         # Dict of {title: code}
-        self.by = {}
+        self.by: Dict[str, int] = {}
 
         table = doc.find(name='table', id='productTable')
         cells = table.select('thead#tblhead > tr:nth-of-type(2) > td')
@@ -47,7 +50,7 @@ class SortParam(Param):
             assert(code > 0)
             self.by[head] = code
 
-    def validate(self, value: Tuple[str, bool]) -> bool:
+    def validate(self, value: (str, bool)) -> bool:
         if value is None:
             return True
         if not isinstance(value, tuple) or len(value) != 2:
@@ -55,7 +58,7 @@ class SortParam(Param):
         by, dirn = value
         return by in self.by and isinstance(dirn, bool)
 
-    def update_qps(self, qps: dict, value: Tuple[str, bool] = None):
+    def update_qps(self, qps: Dict[str, int], value: (str, bool) = None):
         if value is None:
             value = self.default
         title, dirn = value
@@ -74,16 +77,16 @@ class Category(Searchable):
     rex_count = re.compile(r'\((\d+)')
     rex_page = re.compile(r'(\d+)/(\d+)$')
 
-    def __init__(self, session: Session, group, elm: Tag):
+    def __init__(self, session: Session, group: 'Group', elm: Tag):
         """
         :param session: The digikey.session to use for requests
         :param   group: The parent group object
         :param     elm: The <li> corresponding to the category in the product index
         """
         a = elm.find(name='a', recursive=False)
-        self.short_title = a.text
+        self.short_title: str = a.text
         self.group = group
-        self.heads = ()  # Initialized during _get_addl_params
+        self.heads: Tuple[str]  # Initialized during _get_addl_params
         super().__init__(session=session, path=a.attrs['href'],
                          title='%s/%s' % (group.title, self.short_title))
 
@@ -94,7 +97,7 @@ class Category(Searchable):
                     self.size = int(match[1])
                     break
 
-    def _get_addl_params(self):
+    def _get_addl_params(self) -> Iterable[Param]:
         print('Initializing search for category %s...' % self.title)
 
         doc = self.session.get_doc(self.path, {'pageSize': 1})
@@ -118,7 +121,7 @@ class Category(Searchable):
             filt = Filter(title, cell)
             if title == status_head:
                 # '0' is hard-coded because 'Active' is not language-independent
-                filt.default = {next(k for k,v in filt.options.items() if v=='0')}
+                filt.default = {next(k for k, v in filt.options.items() if v == '0')}
             filters.append(filt)
         return filters
 
@@ -199,7 +202,7 @@ class Category(Searchable):
             else:
                 yield Part(attrs)
 
-    def search(self, param_values: dict, filter_qty=True) -> Iterable[Part]:
+    def search(self, param_values: Dict[str, set], filter_qty=True) -> Iterable[Part]:
         """
         Search this category. Calls super() to do the param and request work.
         :param param_values: A dict of {'param_title': value}

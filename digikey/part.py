@@ -1,14 +1,16 @@
-from typing import Iterable
+from typing import Iterable, Tuple, Dict
 
 from .attr import Attr
 
 
 class Part:
     def __init__(self, attrs: Iterable[Attr]):
-        self.attrs = tuple(attrs)
-        self.attrs_by_name = {attr.NAME: attr
-                              for attr in self.attrs
-                              if attr.NAME}
+        self.attrs: Tuple[Attr] = tuple(attrs)
+        self.attrs_by_name: Dict[str, Attr] = {
+            attr.NAME: attr
+            for attr in self.attrs
+            if attr.NAME
+        }
 
     @property
     def vendor(self) -> str:
