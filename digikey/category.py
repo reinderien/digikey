@@ -97,6 +97,9 @@ class Category(Searchable):
                     self.size = int(match[1])
                     break
 
+    def __str__(self) -> str:
+        return self.title
+
     def _get_addl_params(self) -> Iterable[Param]:
         print('Initializing search for category %s...' % self.title)
 

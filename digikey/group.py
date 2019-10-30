@@ -24,6 +24,9 @@ class Group(Searchable):
         self.categories: Dict[str, Category] = {c.short_title: c for c in self._get_categories(elm)}
         self.size: int = sum(c.size for c in self.categories.values())
 
+    def __str__(self) -> str:
+        return self.title
+
     def _get_categories(self, group_elm: Tag) -> Iterable[Category]:
         """
         Initialize the categories for this group via scraping.

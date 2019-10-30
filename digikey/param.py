@@ -17,6 +17,9 @@ class Param:
         """
         self.title, self.name, self.default = title, name, default
 
+    def __str__(self) -> str:
+        return f'{self.name} ({self.title})'
+
     def validate(self, value: Union[str, None]) -> bool:
         """
         Validate this parameter. 'None' should be acceptable and indicates 'unspecified'. No
