@@ -50,7 +50,7 @@ class BoolParam(Param):
     def validate(self, value) -> bool:
         return value in (None, False, True)
 
-    def qp_kv(self, value=None) -> (str, object):
+    def qp_kv(self, value=None) -> (str, int):
         if value is None:
             value = self.default
         if value is not None:
@@ -88,7 +88,7 @@ class ROHSParam(BoolParam):
     This actually controls two QPs: rohs (True) and nonrohs (False).
     """
 
-    def qp_kv(self, value=None) -> (str, object):
+    def qp_kv(self, value=None) -> (str, str):
         if value is None:
             value = self.default
         if value is None:
@@ -122,7 +122,7 @@ class Filter(MultiParam):
             return True
         return isinstance(value, set) and not (value - self.option_titles)
 
-    def qp_kv(self, value=None) -> (str, object):
+    def qp_kv(self, value=None) -> (str, set):
         if value is None:
             value = self.default
         if value:

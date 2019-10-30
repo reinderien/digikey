@@ -113,9 +113,13 @@ class PriceAttr(Attr):
     def __init__(self, name: str, title: str, td: Tag):
         super().__init__(title)
         text = td.find('span').find(text=True, recursive=False)
-        curr, value = self.CURR_RE.match(text.strip()).groups()
-        self.curr: str = curr
-        self.value: float = atof(value)
+        match = self.CURR_RE.match(text.strip())
+        if match:
+            curr, value = match.groups()
+            self.curr: str = curr
+            self.value: float = atof(value)
+        else:
+            self.curr, self.value = None, None
 
 
 class MinQtyAttr(AbstractDesktopAttr):

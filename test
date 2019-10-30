@@ -1,33 +1,82 @@
 #!/usr/bin/env python3
 
+from itertools import islice
 from digikey import Session
+from digikey.category import Category
 
 
-cat_name_en = 'Resistors/Through Hole Resistors'
-cat_name_it = 'Resistori/Resistori da foro passante'
-res_en = 'Resistance'
-res_it = 'Resistenza'
-sess_en_ca = {'country': 'CA'}
-sess_it = {'country': 'IT',
-           'short_lang': 'it',
-           'currency': 'EUR'}
+def init(sess_args: dict, cat_name: str) -> (Session, Category):
+    d, is_new = Session.try_deserialize(**sess_args)
+    if is_new:
+        print('New session created')
+        d.init_groups()
+    else:
+        print('Session restored from cache')
 
-# Change this to change languages
-cat_name, res, sess_args = cat_name_en, res_en, sess_en_ca
+    cat = d.categories[cat_name]
+    if not cat.params:
+        cat.init_params()
 
-d, is_new = Session.try_deserialize(**sess_args)
-if is_new:
-    print('New session created')
-    d.init_groups()
-else:
-    print('Session restored from cache')
+    return d, cat
 
-cat = d.categories[cat_name]
-if is_new:
-    cat.init_params()
 
-prods = tuple(cat.search({
-    res: {'500 Ohms'}
-}))
-print('\n'.join(sorted(str(p) for p in prods)))
-d.serialize()
+def search_res(cat: Category, res: str):
+    prods = tuple(cat.search({
+        res: {'500 Ohms'}
+    }))
+    print('\n'.join(sorted(str(p) for p in prods)))
+
+
+def italian_res():
+    sess_it = {'country': 'IT',
+               'short_lang': 'it',
+               'currency': 'EUR'}
+    sess, cat = init(sess_it, 'Resistori/Resistori da foro passante')
+    search_res(cat, 'Resistenza')
+    sess.serialize()
+
+
+def english_res():
+    sess_en_ca = {'country': 'CA'}
+    sess, cat = init(sess_en_ca, 'Resistors/Through Hole Resistors')
+    search_res(cat, 'Resistance')
+    sess.serialize()
+
+
+def mcu():
+    sess, cat = init({'country': 'CA'},
+                     'Integrated Circuits (ICs)/Embedded - Microcontrollers')
+
+    n = 10
+
+    '''
+    Should be:
+    https://www.digikey.ca/products/en/integrated-circuits-ics/embedded-microcontrollers/685
+        ?FV=-8|685,1989|0
+        &quantity=10
+        &ColumnSort=1000011
+        &page=1
+        &stock=1
+        &pageSize=500
+    
+    Actual:
+    
+    '''
+
+    all_prods = cat.search({
+        'Results per Page': n,
+        'Part Status': {'Active'},
+        'Quantity': 10,
+    })
+
+    first_n = islice(all_prods, n)
+
+    for part in first_n:
+        price = part.attrs_by_name['unitPrice']
+        if price.value is not None:
+            print(f'{price.curr}{price.value:.2f} {part.vendor} {part.mfg_part_no}')
+
+    sess.serialize()
+
+
+mcu()

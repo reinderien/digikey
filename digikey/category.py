@@ -58,14 +58,14 @@ class SortParam(Param):
         by, dirn = value
         return by in self.by and isinstance(dirn, bool)
 
-    def update_qps(self, qps: Dict[str, int], value: (str, bool) = None):
+    def qp_kv(self, value: (str, bool) = None) -> (str, int):
         if value is None:
             value = self.default
         title, dirn = value
         code = self.by[title]
         if not dirn:
             code = -code
-        qps[self.name] = code
+        return self.name, code
 
 
 class Category(Searchable):
