@@ -1,4 +1,5 @@
 import re
+from locale import atoi
 
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
@@ -75,7 +76,7 @@ class Category(Searchable):
     """
 
     rex_count = re.compile(r'\((\d+)')
-    rex_page = re.compile(r'(\d+)/(\d+)$')
+    rex_page = re.compile(r' ([^/ ]+)/([^/]+)$')
 
     def __init__(self, session: Session, group: 'Group', elm: Tag):
         """
@@ -223,7 +224,7 @@ class Category(Searchable):
 
             page_text = doc.select('span.current-page')[0].text.strip()
             this_page, size = Category.rex_page.search(page_text).groups()
-            this_page, size = int(this_page), int(size)
+            this_page, size = atoi(this_page), atoi(size)
             assert(this_page == page)
             if page >= size:
                 break

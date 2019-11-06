@@ -11,6 +11,10 @@ class Part:
             for attr in self.attrs
             if attr.NAME
         }
+        self.attrs_by_title: Dict[str, Attr] = {
+            attr.title: attr
+            for attr in self.attrs
+        }
 
     @property
     def vendor(self) -> str:

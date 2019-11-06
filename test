@@ -3,6 +3,7 @@
 from itertools import islice
 from digikey import Session
 from digikey.category import Category
+from digikey.eng import iec_to_int
 
 
 def init(sess_args: dict, cat_name: str) -> (Session, Category):
@@ -46,8 +47,7 @@ def english_res():
 def mcu():
     sess, cat = init({'country': 'CA'},
                      'Integrated Circuits (ICs)/Embedded - Microcontrollers')
-
-    n = 10
+    sess.serialize()
 
     '''
     Should be:
@@ -60,23 +60,44 @@ def mcu():
         &pageSize=500
     
     Actual:
+    ... pv1989=0
     
+    Need to filter for 'MAX32660GWE+TCT-ND' to reproduce qty multiline parsing bug
     '''
 
+    n = 10_000
+    qty = 10
+
     all_prods = cat.search({
-        'Results per Page': n,
+        'Results per Page': min(500, n),
         'Part Status': {'Active'},
-        'Quantity': 10,
+        'Quantity': qty,
     })
 
-    first_n = islice(all_prods, n)
+    prods_with_prices = (
+        (p.attrs_by_name['unitPrice'].value,
+         p.attrs_by_title['Program Memory Size'].value)
+        for p in islice(all_prods, n)
+    )
 
-    for part in first_n:
-        price = part.attrs_by_name['unitPrice']
-        if price.value is not None:
-            print(f'{price.curr}{price.value:.2f} {part.vendor} {part.mfg_part_no}')
+    filtered_prods = [
+        (price, iec_to_int(memory.split()[0]))
+        for price, memory in prods_with_prices if price and memory != '-'
+    ]
 
-    sess.serialize()
+    import seaborn
+    import pandas as pd
+
+    frame = pd.DataFrame(data=filtered_prods,
+                         columns=('price', 'memory'))
+
+    plot = seaborn.scatterplot(
+        data=frame,
+        x='memory',
+        y='price'
+    )
+    fig = plot.get_figure()
+    fig.savefig('output.png')
 
 
 mcu()
