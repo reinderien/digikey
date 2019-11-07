@@ -2,7 +2,7 @@ import re
 from locale import atoi, atof
 from typing import Type, Dict
 
-from bs4.element import Tag
+from bs4.element import Tag, NavigableString
 from .types import OptionalStr
 
 
@@ -91,8 +91,8 @@ class DescriptionAttr(BasicAttr):
 class AbstractDesktopAttr(Attr):
     def __init__(self, name: str, title: str, td: Tag):
         super().__init__(title)
-        sp = td.find('span', class_='desktop')
-        self._raw: str = sp.text.strip()
+        self._sp = td.find('span', class_='desktop')
+        self._raw: str = self._sp.text.strip()
 
 
 class QtyAvailAttr(AbstractDesktopAttr):
@@ -100,10 +100,13 @@ class QtyAvailAttr(AbstractDesktopAttr):
 
     def __init__(self, name: str, title: str, td: Tag):
         super().__init__(name, title, td)
-        parts = self._raw.split('-')
-        value, avail = (p.strip() for p in parts)
-        self.value: int = atoi(value)
-        self.availability: str = avail
+        self.quantities = {}
+        for line in self._sp.children:
+            if isinstance(line, NavigableString):
+                parts = line.split('-')
+                if len(parts) == 2:
+                    value, avail = (p.strip() for p in parts)
+                    self.quantities[avail] = atoi(value)
 
 
 class PriceAttr(Attr):

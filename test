@@ -61,8 +61,6 @@ def mcu():
     
     Actual:
     ... pv1989=0
-    
-    Need to filter for 'MAX32660GWE+TCT-ND' to reproduce qty multiline parsing bug
     '''
 
     n = 10_000
