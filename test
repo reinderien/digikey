@@ -63,37 +63,47 @@ def mcu():
     ... pv1989=0
     '''
 
-    n = 10_000
+    n = 1_000
     qty = 10
 
-    all_prods = cat.search({
+    all_prods = islice(cat.search({
         'Results per Page': min(500, n),
         'Part Status': {'Active'},
         'Quantity': qty,
-    })
+    }), n)
 
     prods_with_prices = (
-        (p.attrs_by_name['unitPrice'].value,
-         p.attrs_by_title['Program Memory Size'].value)
-        for p in islice(all_prods, n)
+        (
+            p.attrs_by_name['unitPrice'].value,
+            p.attrs_by_title['Program Memory Size'].value,
+            p.attrs_by_title['Number of I/O'].value,
+        )
+        for p in all_prods
     )
 
-    filtered_prods = [
-        (price, iec_to_int(memory.split()[0]))
-        for price, memory in prods_with_prices if price and memory != '-'
-    ]
+    filtered_prods = (
+        (
+            price,
+            iec_to_int(memory.split()[0]),
+            int(io),
+        )
+        for price, memory, io in prods_with_prices
+        if price and memory != '-' and io != '-'
+    )
 
     import seaborn
     import pandas as pd
 
     frame = pd.DataFrame(data=filtered_prods,
-                         columns=('price', 'memory'))
+                         columns=('price', 'memory', 'io'))
 
     plot = seaborn.scatterplot(
         data=frame,
         x='memory',
-        y='price'
+        y='price',
+        hue='io',
     )
+    plot.set(xscale='log')
     fig = plot.get_figure()
     fig.savefig('output.png')
 
