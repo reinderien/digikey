@@ -219,7 +219,12 @@ class Category(Searchable):
 
         for page in count(1):
             doc = super().search(param_values, {'page': page})
-            table = doc.select('table#productTable')[0]
+
+            if len(doc.select('table#productTable')) > 0:
+                table = doc.select('table#productTable')[0]
+            else:
+                break
+
             yield from self._get_parts(table, filter_qty, qty)
 
             page_text = doc.select('span.current-page')[0].text.strip()
