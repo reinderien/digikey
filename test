@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 
-from itertools import islice
+from itertools import islice, chain
 from digikey import Session
 from digikey.category import Category
-from digikey.eng import iec_to_int
+from digikey.eng import si_to_int
 
 
 def init(sess_args: dict, cat_name: str) -> (Session, Category):
@@ -63,37 +63,59 @@ def mcu():
     ... pv1989=0
     '''
 
-    n = 10_000
+    n = 2_000
     qty = 10
 
-    all_prods = cat.search({
+    all_prods = iter(cat.search({
         'Results per Page': min(500, n),
         'Part Status': {'Active'},
         'Quantity': qty,
-    })
+    }))
+
+    first = next(all_prods)
+    print('\nTitles for microcontrollers:')
+    print('\n'.join(f'   {k}' for k in first.attrs_by_title.keys()))
+    prods = tuple(islice(chain((first,), all_prods), n))
 
     prods_with_prices = (
-        (p.attrs_by_name['unitPrice'].value,
-         p.attrs_by_title['Program Memory Size'].value)
-        for p in islice(all_prods, n)
+        (
+            p.attrs_by_name['unitPrice'].value,
+            p.attrs_by_title['Program Memory Size'].value,
+            p.attrs_by_title['Number of I/O'].value,
+            p.attrs_by_title['Speed'].value,
+        )
+        for p in prods
     )
 
     filtered_prods = [
-        (price, iec_to_int(memory.split()[0]))
-        for price, memory in prods_with_prices if price and memory != '-'
+        (
+            price,
+            si_to_int(memory, 1024),
+            int(io),
+            si_to_int(speed),
+        )
+        for price, memory, io, speed in prods_with_prices
+        if (
+            price
+            and memory != '-'
+            and io != '-'
+            and speed != '-'
+        )
     ]
 
-    import seaborn
-    import pandas as pd
+    from pandas import DataFrame
+    from seaborn import scatterplot
 
-    frame = pd.DataFrame(data=filtered_prods,
-                         columns=('price', 'memory'))
+    frame = DataFrame(data=filtered_prods,
+                      columns=('price', 'memory', 'io', 'speed'))
 
-    plot = seaborn.scatterplot(
+    plot = scatterplot(
         data=frame,
-        x='memory',
-        y='price'
+        x='speed',
+        y='io',
+        hue='price',
     )
+    plot.set(xscale='log')
     fig = plot.get_figure()
     fig.savefig('output.png')
 

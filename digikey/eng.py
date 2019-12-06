@@ -4,8 +4,8 @@ POS_CHARS = 'kMGTPEZY'
 NEG_CHARS = 'mμnpfazy'
 
 
-def iec_to_int(s: str):
-    match = re.search(r'(\d+)(.*)B', s)
+def si_to_int(s: str, base: int=1000):
+    match = re.search(r'(\d+)(\D)', s)
     x, pre = match.groups()
     x = int(x)
 
@@ -14,4 +14,4 @@ def iec_to_int(s: str):
     except ValueError:
         return x
 
-    return x*2**(10 * exp)
+    return x*base**exp
